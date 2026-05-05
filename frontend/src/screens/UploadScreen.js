@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../api';
+import { useAnalysis } from '../context/AnalysisContext';
 
-export default function UploadScreen({ token, userEmail, onLogout }) {
+export default function UploadScreen({ token, userEmail, onLogout, onOpenProgress }) {
   const [image, setImage] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const { uploading, setUploading, setLatestResult } = useAnalysis();
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -26,7 +26,28 @@ export default function UploadScreen({ token, userEmail, onLogout }) {
     }
 
     setImage(pickerResult.assets[0]);
-    setResult(null);
+    setLatestResult(null);
+    setError(null);
+  };
+
+  const captureImage = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setError('Camera permission is required.');
+      return;
+    }
+
+    const cameraResult = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (cameraResult.canceled) {
+      return;
+    }
+
+    setImage(cameraResult.assets[0]);
+    setLatestResult(null);
     setError(null);
   };
 
@@ -41,7 +62,8 @@ export default function UploadScreen({ token, userEmail, onLogout }) {
 
     try {
       const response = await uploadImage(token, image);
-      setResult(response);
+      setLatestResult(response);
+      onOpenProgress();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -56,6 +78,9 @@ export default function UploadScreen({ token, userEmail, onLogout }) {
       <TouchableOpacity style={styles.button} onPress={pickImage}>
         <Text style={styles.buttonText}>Choose Photo</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={captureImage}>
+        <Text style={styles.buttonText}>Take Photo</Text>
+      </TouchableOpacity>
 
       {image ? (
         <Image source={{ uri: image.uri }} style={styles.preview} />
@@ -69,15 +94,9 @@ export default function UploadScreen({ token, userEmail, onLogout }) {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {result ? (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultTitle}>Upload Result</Text>
-          <Text>File: {result.filename}</Text>
-          <Text>Stage: {result.analysis?.resultStage || 'N/A'}</Text>
-          <Text>Probability: {result.analysis?.probability ?? 'N/A'}</Text>
-          <Text>Uploaded At: {result.uploadedAt}</Text>
-        </View>
-      ) : null}
+      <TouchableOpacity style={styles.secondaryButton} onPress={onOpenProgress}>
+        <Text style={styles.secondaryButtonText}>진행 결과 확인</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
         <Text style={styles.logoutText}>Log Out</Text>
@@ -127,16 +146,16 @@ const styles = StyleSheet.create({
     color: '#b91c1c',
     marginVertical: 12,
   },
-  resultBox: {
+  secondaryButton: {
     marginTop: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
+    backgroundColor: '#1d4ed8',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  resultTitle: {
+  secondaryButtonText: {
+    color: '#fff',
     fontWeight: '700',
-    marginBottom: 8,
   },
   logoutButton: {
     marginTop: 24,
