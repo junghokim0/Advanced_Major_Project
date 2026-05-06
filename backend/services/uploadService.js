@@ -7,10 +7,32 @@ const analysisRepository = require('../repositories/analysisRepository');
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:5001';
 const AI_SERVER_TIMEOUT_MS = Number(process.env.AI_SERVER_TIMEOUT_MS || 10000);
 
-const getCategoryByScore = (score) => {
-  if (score <= 33) return 1;
-  if (score <= 66) return 2;
-  return 3;
+const normalizeProbabilities = (probabilities) => {
+  const class1 = Number(probabilities?.class1);
+  const class2 = Number(probabilities?.class2);
+  const class3 = Number(probabilities?.class3);
+
+  if (
+    !Number.isFinite(class1) ||
+    !Number.isFinite(class2) ||
+    !Number.isFinite(class3) ||
+    class1 < 0 ||
+    class2 < 0 ||
+    class3 < 0
+  ) {
+    throw new Error('Invalid AI response probabilities.');
+  }
+
+  const total = class1 + class2 + class3;
+  if (total <= 0) {
+    throw new Error('Invalid AI response probabilities.');
+  }
+
+  return {
+    class1: Number((class1 / total).toFixed(4)),
+    class2: Number((class2 / total).toFixed(4)),
+    class3: Number((class3 / total).toFixed(4)),
+  };
 };
 
 const requestAIServer = async (file) => {
@@ -25,12 +47,21 @@ const requestAIServer = async (file) => {
     timeout: AI_SERVER_TIMEOUT_MS,
   });
 
-  const score = Number(response.data?.score);
-  if (!Number.isInteger(score) || score < 1 || score > 100) {
-    throw new Error('Invalid AI response score.');
+  const predictedClass = Number(response.data?.predictedClass);
+  const rawPredictedClass = Number(response.data?.rawPredictedClass ?? predictedClass);
+  const probabilities = normalizeProbabilities(response.data?.probabilities || {});
+  const corrected = Boolean(response.data?.corrected);
+  const correctionReason =
+    typeof response.data?.correctionReason === 'string' ? response.data.correctionReason : null;
+
+  if (!Number.isInteger(predictedClass) || predictedClass < 1 || predictedClass > 3) {
+    throw new Error('Invalid AI response predictedClass.');
+  }
+  if (!Number.isInteger(rawPredictedClass) || rawPredictedClass < 1 || rawPredictedClass > 3) {
+    throw new Error('Invalid AI response rawPredictedClass.');
   }
 
-  return { score };
+  return { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason };
 };
 
 exports.processUpload = async (file, user) => {
@@ -52,19 +83,25 @@ exports.processUpload = async (file, user) => {
   let analysisResult = null;
   try {
     const aiResponse = await requestAIServer(file);
-    const score = aiResponse.score;
-    const category = getCategoryByScore(score);
-    const resultStage = `score-${score}`;
-    const probability = Number((score / 100).toFixed(4));
+    const { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason } = aiResponse;
+    const confidence = Math.max(probabilities.class1, probabilities.class2, probabilities.class3);
+    const resultStage = `class-${predictedClass}`;
 
-    // 기존 DB 스키마를 유지하기 위해 score를 stage/probability로 매핑해 저장.
+    // 기존 DB 스키마를 유지하기 위해 predictedClass/confidence를 저장.
     await analysisRepository.saveAnalysisResult({
       uploadId,
       resultStage,
-      probability,
+      probability: confidence,
     });
 
-    analysisResult = { score, category };
+    analysisResult = {
+      rawPredictedClass,
+      predictedClass,
+      confidence,
+      probabilities,
+      corrected,
+      correctionReason,
+    };
   } catch (aiError) {
     console.error('AI analysis failed:', aiError.message);
     // AI 실패 시에도 업로드는 성공으로 처리

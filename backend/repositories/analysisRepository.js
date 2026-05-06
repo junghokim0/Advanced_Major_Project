@@ -15,8 +15,10 @@ exports.getAnalysisHistoryByUserId = async (userId) => {
       ah.id as analysisId,
       ah.result_stage as resultStage,
       ah.probability,
-      ROUND(ah.probability * 100) as score,
       CASE
+        WHEN ah.result_stage = 'class-1' THEN 1
+        WHEN ah.result_stage = 'class-2' THEN 2
+        WHEN ah.result_stage = 'class-3' THEN 3
         WHEN ROUND(ah.probability * 100) BETWEEN 1 AND 33 THEN 1
         WHEN ROUND(ah.probability * 100) BETWEEN 34 AND 66 THEN 2
         ELSE 3

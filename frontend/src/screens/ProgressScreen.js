@@ -24,11 +24,10 @@ const COLORS = {
 };
 const RADIUS = { card: 12, button: 12 };
 
-function getCategory(score) {
-  const value = Number(score) || 0;
-  if (value >= 80) return { label: 'Good', color: COLORS.medical600, bg: COLORS.medical50 };
-  if (value >= 60) return { label: 'Average', color: COLORS.amber500, bg: COLORS.amber50 };
-  return { label: 'Needs Care', color: COLORS.red500, bg: COLORS.red50 };
+function getCategoryMeta(category) {
+  if (Number(category) === 1) return { label: '정상 단계', color: COLORS.medical600, bg: COLORS.medical50 };
+  if (Number(category) === 2) return { label: '의심 단계', color: COLORS.amber500, bg: COLORS.amber50 };
+  return { label: '진행 단계', color: COLORS.red500, bg: COLORS.red50 };
 }
 
 function formatDate(dateString) {
@@ -49,8 +48,8 @@ const RING_STROKE = 12;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-function ScoreRing({ score }) {
-  const value = Math.max(0, Math.min(100, Number(score) || 0));
+function ConfidenceRing({ confidence }) {
+  const value = Math.max(0, Math.min(100, Math.round((Number(confidence) || 0) * 100)));
   const offset = RING_CIRCUMFERENCE * (1 - value / 100);
   const center = RING_SIZE / 2;
   return (
@@ -79,14 +78,14 @@ function ScoreRing({ score }) {
       </Svg>
       <View style={styles.ringCenter}>
         <Text style={styles.ringScore}>{value}</Text>
-        <Text style={styles.ringScoreSuffix}>/100</Text>
+        <Text style={styles.ringScoreSuffix}>%</Text>
       </View>
     </View>
   );
 }
 
-function CategoryBadge({ score }) {
-  const cat = getCategory(score);
+function CategoryBadge({ category }) {
+  const cat = getCategoryMeta(category);
   return (
     <View style={[styles.badge, { backgroundColor: cat.bg }]}>
       <Text style={[styles.badgeText, { color: cat.color }]}>{cat.label}</Text>
@@ -96,7 +95,7 @@ function CategoryBadge({ score }) {
 
 export default function ProgressScreen({ token, onBack }) {
   const [error, setError] = useState(null);
-  const { historyLoading, setHistoryLoading, history, setHistory } = useAnalysis();
+  const { historyLoading, setHistoryLoading, history, setHistory, latestResult } = useAnalysis();
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -118,31 +117,45 @@ export default function ProgressScreen({ token, onBack }) {
 
   const summary = useMemo(() => {
     if (!history.length) return null;
-    const scores = history.map((item) => Number(item.score) || 0);
-    const avg = Math.round(scores.reduce((acc, cur) => acc + cur, 0) / scores.length);
+    const confidences = history.map((item) => Number(item.probability) || 0);
+    const avgConfidence = Math.round((confidences.reduce((acc, cur) => acc + cur, 0) / confidences.length) * 100);
+    const latestCategory = Number(history[0].category) || 0;
     return {
       count: history.length,
-      latest: scores[0],
-      average: avg,
+      latestCategory,
+      averageConfidence: avgConfidence,
     };
   }, [history]);
 
   const chartData = useMemo(() => {
     const labels = history.map((item) => formatDate(item.analyzedAt));
-    const scores = history.map((item) => Number(item.score) || 0);
-    return { labels, datasets: [{ data: scores }] };
+    const categories = history.map((item) => Number(item.category) || 0);
+    return { labels, datasets: [{ data: categories }] };
   }, [history]);
 
   const beforeAfter = useMemo(() => {
     if (history.length < 2) return null;
-    const before = Number(history[1].score) || 0;
-    const after = Number(history[0].score) || 0;
+    const before = Number(history[1].category) || 0;
+    const after = Number(history[0].category) || 0;
     const diff = after - before;
     return { before, after, diff };
   }, [history]);
 
   const latest = history[0] || null;
   const recentList = history.slice(0, 6);
+  const correctionReason = latestResult?.analysis?.corrected ? latestResult?.analysis?.correctionReason : null;
+  const latestClassProbabilities = latestResult?.analysis?.probabilities || null;
+  const classProbabilityRows = latestClassProbabilities
+    ? [
+        { key: 'class1', label: 'Class 1 (정상 단계)' },
+        { key: 'class2', label: 'Class 2 (의심 단계)' },
+        { key: 'class3', label: 'Class 3 (진행 단계)' },
+      ].map((item) => {
+        const value = Number(latestClassProbabilities[item.key]) || 0;
+        const percent = Math.max(0, Math.min(100, Math.round(value * 1000) / 10));
+        return { ...item, percent };
+      })
+    : [];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
@@ -175,15 +188,38 @@ export default function ProgressScreen({ token, onBack }) {
           <Text style={styles.cardTitle}>최신 분석 결과</Text>
           <View style={styles.latestRow}>
             <View style={styles.latestInfo}>
-              <Text style={styles.latestScore}>{Number(latest.score) || 0}</Text>
-              <Text style={styles.latestScoreLabel}>점수</Text>
+              <Text style={styles.latestScore}>Class {Number(latest.category) || '-'}</Text>
+              <Text style={styles.latestScoreLabel}>예측 클래스</Text>
               <View style={{ marginTop: 8 }}>
-                <CategoryBadge score={latest.score} />
+                <CategoryBadge category={latest.category} />
               </View>
               <Text style={styles.latestDate}>{formatFullDate(latest.analyzedAt)}</Text>
             </View>
-            <ScoreRing score={latest.score} />
+            <ConfidenceRing confidence={latest.probability} />
           </View>
+        </View>
+      ) : null}
+
+      {classProbabilityRows.length ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>클래스별 예측 확률</Text>
+          {classProbabilityRows.map((item) => (
+            <View key={item.key} style={styles.probabilityRow}>
+              <View style={styles.probabilityHeader}>
+                <Text style={styles.probabilityLabel}>{item.label}</Text>
+                <Text style={styles.probabilityValue}>{item.percent.toFixed(1)}%</Text>
+              </View>
+              <View style={styles.probabilityTrack}>
+                <View style={[styles.probabilityFill, { width: `${item.percent}%` }]} />
+              </View>
+            </View>
+          ))}
+          {correctionReason ? (
+            <View style={styles.correctionBox}>
+              <Text style={styles.correctionTitle}>보정 적용 안내</Text>
+              <Text style={styles.correctionText}>{correctionReason}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -193,14 +229,14 @@ export default function ProgressScreen({ token, onBack }) {
           <View style={styles.compareRow}>
             <View style={styles.compareBox}>
               <Text style={styles.compareLabel}>이전</Text>
-              <Text style={styles.compareScore}>{beforeAfter.before}</Text>
-              <CategoryBadge score={beforeAfter.before} />
+              <Text style={styles.compareScore}>C{beforeAfter.before}</Text>
+              <CategoryBadge category={beforeAfter.before} />
             </View>
             <Text style={styles.compareArrow}>→</Text>
             <View style={styles.compareBox}>
               <Text style={styles.compareLabel}>최신</Text>
-              <Text style={styles.compareScore}>{beforeAfter.after}</Text>
-              <CategoryBadge score={beforeAfter.after} />
+              <Text style={styles.compareScore}>C{beforeAfter.after}</Text>
+              <CategoryBadge category={beforeAfter.after} />
             </View>
           </View>
           <Text
@@ -218,14 +254,14 @@ export default function ProgressScreen({ token, onBack }) {
           >
             {beforeAfter.diff > 0 ? '+' : ''}
             {beforeAfter.diff}
-            {beforeAfter.diff > 0 ? ' 증가' : beforeAfter.diff < 0 ? ' 감소' : ' 변화 없음'}
+            {beforeAfter.diff > 0 ? ' 단계 증가' : beforeAfter.diff < 0 ? ' 단계 감소' : ' 단계 변화 없음'}
           </Text>
         </View>
       ) : null}
 
       {!historyLoading && !error && history.length ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>12개월 추이 (1~100)</Text>
+          <Text style={styles.cardTitle}>12개월 클래스 추이 (1~3)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <LineChart
               data={chartData}
@@ -234,6 +270,9 @@ export default function ProgressScreen({ token, onBack }) {
               yAxisSuffix=""
               yAxisInterval={1}
               fromZero
+              segments={3}
+              yLabelsOffset={8}
+              formatYLabel={(value) => String(Math.round(Number(value)))}
               chartConfig={{
                 backgroundColor: COLORS.white,
                 backgroundGradientFrom: COLORS.white,
@@ -264,8 +303,8 @@ export default function ProgressScreen({ token, onBack }) {
             >
               <Text style={styles.historyDate}>{formatFullDate(item.analyzedAt)}</Text>
               <View style={styles.historyRight}>
-                <Text style={styles.historyScore}>{Number(item.score) || 0}</Text>
-                <CategoryBadge score={item.score} />
+                <Text style={styles.historyScore}>C{Number(item.category) || 0}</Text>
+                <CategoryBadge category={item.category} />
               </View>
             </View>
           ))}
@@ -279,12 +318,12 @@ export default function ProgressScreen({ token, onBack }) {
             <Text style={styles.statLabel}>기록 수</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{summary.latest}</Text>
-            <Text style={styles.statLabel}>최근 점수</Text>
+            <Text style={styles.statValue}>C{summary.latestCategory || '-'}</Text>
+            <Text style={styles.statLabel}>최근 클래스</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{summary.average}</Text>
-            <Text style={styles.statLabel}>평균 점수</Text>
+            <Text style={styles.statValue}>{summary.averageConfidence}%</Text>
+            <Text style={styles.statLabel}>평균 신뢰도</Text>
           </View>
         </View>
       ) : null}
@@ -471,6 +510,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '700',
+  },
+  probabilityRow: {
+    marginBottom: 12,
+  },
+  probabilityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  probabilityLabel: {
+    color: COLORS.neutral700,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  probabilityValue: {
+    color: COLORS.neutral800,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  probabilityTrack: {
+    width: '100%',
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.neutral200,
+    overflow: 'hidden',
+  },
+  probabilityFill: {
+    height: '100%',
+    backgroundColor: COLORS.medical600,
+    borderRadius: 999,
+  },
+  correctionBox: {
+    marginTop: 8,
+    backgroundColor: COLORS.amber50,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  correctionTitle: {
+    color: '#92400e',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  correctionText: {
+    color: '#92400e',
+    fontSize: 12,
+    lineHeight: 18,
   },
   chart: {
     borderRadius: RADIUS.card,

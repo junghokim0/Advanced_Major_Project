@@ -2,6 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const uploadService = require('../services/uploadService');
 
+const detectMimeType = (filename = '') => {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  return 'image/jpeg';
+};
+
 exports.uploadImage = async (req, res, next) => {
   try {
     let file = req.file;
@@ -38,7 +46,7 @@ exports.uploadImage = async (req, res, next) => {
         fieldname: 'image',
         originalname: filename || 'photo.jpg',
         encoding: '7bit',
-        mimetype: mimetype || 'image/jpeg',
+        mimetype: (mimetype && mimetype.includes('/')) ? mimetype : detectMimeType(filename || 'photo.jpg'),
         size: buffer.length,
         destination: uploadsDir,
         filename: savedFilename,

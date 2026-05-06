@@ -15,8 +15,20 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
   }
 
   await new Promise((resolve) => setTimeout(resolve, 800));
-  const score = Math.floor(Math.random() * 100) + 1;
-  return res.json({ score });
+  const raw = [Math.random(), Math.random(), Math.random()];
+  const sum = raw.reduce((acc, cur) => acc + cur, 0);
+  const probabilities = raw.map((value) => Number((value / sum).toFixed(4)));
+  const maxProb = Math.max(...probabilities);
+  const predictedClass = probabilities.indexOf(maxProb) + 1;
+
+  return res.json({
+    predictedClass,
+    probabilities: {
+      class1: probabilities[0],
+      class2: probabilities[1],
+      class3: probabilities[2],
+    },
+  });
 });
 
 app.listen(PORT, () => {
