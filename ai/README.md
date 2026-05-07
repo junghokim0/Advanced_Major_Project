@@ -88,6 +88,14 @@ EfficientNet-B0의 마지막 feature vector는 fully connected classification la
 반면 3단계라고 예측했지만 하나라도 저 rule을 만족하지 않는다면 원래 예측한 값으로 확정
 
 이를 통해 1단계와 3단계의 경계를 구분 짓는다.
+---
 
+# Dataset
+
+Due to GitHub file size limitations, the dataset is stored externally.
+
+## Google Drive Link
+
+[Dataset Download](https://drive.google.com/drive/folders/1jDWKujlqiNepTWko2PPIYYUj0Z1e3ioV?usp=drive_link)
 
 

@@ -9,3 +9,5 @@ frontend/.env
 dist/
 build/
 .expo/
+
+*.zip
