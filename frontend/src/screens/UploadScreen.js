@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../api';
@@ -24,11 +24,32 @@ const PATTERN_OPTIONS = [
   { value: 'm_line', label: 'M자', hint: '이마·헤어라인 촬영' },
 ];
 
-export default function UploadScreen({ token, userEmail, onLogout, onOpenProgress }) {
+export default function UploadScreen({
+  token,
+  userEmail,
+  pendingCapture,
+  onPendingCaptureHandled,
+  onOpenCustomCamera,
+  onLogout,
+  onOpenProgress,
+}) {
   const [image, setImage] = useState(null);
   const [patternType, setPatternType] = useState('crown');
   const [error, setError] = useState(null);
   const { uploading, setUploading, latestResult, setLatestResult } = useAnalysis();
+
+  useEffect(() => {
+    if (!pendingCapture) return;
+    setImage(pendingCapture);
+    if (pendingCapture.patternType) {
+      setPatternType(pendingCapture.patternType);
+    } else if (pendingCapture.croppedToGuide) {
+      setPatternType('m_line');
+    }
+    setLatestResult(null);
+    setError(null);
+    onPendingCaptureHandled?.();
+  }, [pendingCapture, onPendingCaptureHandled, setLatestResult]);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,9 +73,14 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
   };
 
   const captureImage = async () => {
+    if (patternType === 'm_line') {
+      onOpenCustomCamera?.();
+      return;
+    }
+
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setError('Camera permission is required.');
+      setError('카메라 권한이 필요합니다.');
       return;
     }
 
@@ -82,8 +108,15 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
     setError(null);
 
     try {
-      const response = await uploadImage(token, image, patternType);
+      const uploadPatternType =
+        image?.patternType || (image?.croppedToGuide ? 'm_line' : null) || patternType;
+      const response = await uploadImage(token, image, uploadPatternType);
       setLatestResult(response);
+      if (!response?.analysis) {
+        const detail = response?.analysisError || 'AI 서버에 연결하지 못했습니다.';
+        setError(`사진은 저장됐지만 분석에 실패했습니다. AI 서버(8000) 실행 후 다시 시도해 주세요.\n${detail}`);
+        return;
+      }
       onOpenProgress();
     } catch (err) {
       setError(err.message);
@@ -123,7 +156,9 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
           })}
         </View>
         {patternType === 'm_line' ? (
-          <Text style={styles.patternNotice}>M자 모델 학습 전까지 임시(mock) 분석이 적용됩니다.</Text>
+          <Text style={styles.patternNotice}>
+            M자 촬영 시 커스텀 카메라·수평 확인이 적용됩니다. (가이드라인은 추후 추가)
+          </Text>
         ) : null}
       </View>
 
@@ -134,7 +169,9 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionCard} onPress={captureImage} activeOpacity={0.85}>
           <Text style={styles.actionLabel}>Take Photo</Text>
-          <Text style={styles.actionHint}>카메라로 촬영</Text>
+          <Text style={styles.actionHint}>
+            {patternType === 'm_line' ? '수평 확인 촬영' : '카메라로 촬영'}
+          </Text>
         </TouchableOpacity>
       </View>
 

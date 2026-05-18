@@ -75,7 +75,11 @@ exports.uploadImage = async (req, res, next) => {
       mimetype: file.mimetype,
     });
 
-    const result = await uploadService.processUpload(file, req.user, req.body.patternType);
+    const patternType =
+      req.body?.patternType || req.headers['x-pattern-type'] || req.query?.patternType;
+    console.log('[Upload] patternType:', patternType);
+
+    const result = await uploadService.processUpload(file, req.user, patternType);
     res.json(result);
   } catch (error) {
     console.error('Upload error:', error);

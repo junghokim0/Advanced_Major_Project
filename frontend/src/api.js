@@ -94,6 +94,7 @@ export async function uploadImage(token, image, patternType = 'crown') {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'X-Pattern-Type': patternType,
     },
     body: JSON.stringify({
       file: base64,

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import LoginScreen from './src/screens/LoginScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
 import UploadScreen from './src/screens/UploadScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
+import CameraCaptureScreen from './src/screens/CameraCaptureScreen';
 import { AnalysisProvider, useAnalysis } from './src/context/AnalysisContext';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -16,6 +17,7 @@ function AppContent() {
   const [userEmail, setUserEmail] = useState(null);
   const [currentScreen, setCurrentScreen] = useState('upload');
   const [appPhase, setAppPhase] = useState('loading');
+  const [pendingCapture, setPendingCapture] = useState(null);
   const { resetAnalysisState } = useAnalysis();
 
   useEffect(() => {
@@ -40,10 +42,15 @@ function AppContent() {
     setCurrentScreen('upload');
   };
 
+  const handlePendingCaptureHandled = useCallback(() => {
+    setPendingCapture(null);
+  }, []);
+
   const handleLogout = () => {
     setToken(null);
     setUserEmail(null);
     setCurrentScreen('upload');
+    setPendingCapture(null);
     resetAnalysisState();
   };
 
@@ -51,14 +58,29 @@ function AppContent() {
     return <LoadingScreen />;
   }
 
+  if (token && currentScreen === 'camera') {
+    return (
+      <CameraCaptureScreen
+        onCapture={(asset) => {
+          setPendingCapture(asset);
+          setCurrentScreen('upload');
+        }}
+        onCancel={() => setCurrentScreen('upload')}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.inner}>
+      <View style={currentScreen === 'upload' ? styles.inner : styles.innerFull}>
         {token ? (
           currentScreen === 'upload' ? (
             <UploadScreen
               token={token}
               userEmail={userEmail}
+              pendingCapture={pendingCapture}
+              onPendingCaptureHandled={handlePendingCaptureHandled}
+              onOpenCustomCamera={() => setCurrentScreen('camera')}
               onLogout={handleLogout}
               onOpenProgress={() => setCurrentScreen('progress')}
             />
@@ -87,6 +109,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   inner: {
+    flex: 1,
+    padding: 16,
+  },
+  innerFull: {
     flex: 1,
     padding: 16,
   },

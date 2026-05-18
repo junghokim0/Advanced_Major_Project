@@ -3,6 +3,7 @@ import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableO
 import { LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
 import { getAnalysisHistory } from '../api';
+import { getCategoryMeta, getClassProbabilityLabels } from '../constants/analysisLabels';
 import { useAnalysis } from '../context/AnalysisContext';
 
 const COLORS = {
@@ -32,12 +33,6 @@ const PATTERN_OPTIONS = [
 function getPatternLabel(patternType) {
   if (patternType === 'm_line') return 'M자';
   return '정수리';
-}
-
-function getCategoryMeta(category) {
-  if (Number(category) === 1) return { label: '정상 단계', color: COLORS.medical600, bg: COLORS.medical50 };
-  if (Number(category) === 2) return { label: '의심 단계', color: COLORS.amber500, bg: COLORS.amber50 };
-  return { label: '진행 단계', color: COLORS.red500, bg: COLORS.red50 };
 }
 
 function formatDate(dateString) {
@@ -94,8 +89,8 @@ function ConfidenceRing({ confidence }) {
   );
 }
 
-function CategoryBadge({ category }) {
-  const cat = getCategoryMeta(category);
+function CategoryBadge({ category, patternType }) {
+  const cat = getCategoryMeta(category, patternType);
   return (
     <View style={[styles.badge, { backgroundColor: cat.bg }]}>
       <Text style={[styles.badgeText, { color: cat.color }]}>{cat.label}</Text>
@@ -160,15 +155,14 @@ export default function ProgressScreen({ token, onBack }) {
 
   const latest = history[0] || null;
   const recentList = history.slice(0, 6);
+  const analysisFailed =
+    latestResult && latestResult.analysisStatus === 'failed' && !latestResult?.analysis;
   const isMockEngine = latestResult?.analysis?.engine === 'mock';
   const correctionReason = latestResult?.analysis?.corrected ? latestResult?.analysis?.correctionReason : null;
   const latestClassProbabilities = latestResult?.analysis?.probabilities || null;
+  const resultPatternType = latestResult?.patternType || latestResult?.analysis?.patternType || patternType;
   const classProbabilityRows = latestClassProbabilities
-    ? [
-        { key: 'class1', label: 'Class 1 (정상 단계)' },
-        { key: 'class2', label: 'Class 2 (의심 단계)' },
-        { key: 'class3', label: 'Class 3 (진행 단계)' },
-      ].map((item) => {
+    ? getClassProbabilityLabels(resultPatternType).map((item) => {
         const value = Number(latestClassProbabilities[item.key]) || 0;
         const percent = Math.max(0, Math.min(100, Math.round(value * 1000) / 10));
         return { ...item, percent };
@@ -207,6 +201,15 @@ export default function ProgressScreen({ token, onBack }) {
         })}
       </View>
 
+      {analysisFailed ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            최근 업로드는 저장됐지만 AI 분석이 실패했습니다.{'\n'}
+            {latestResult.analysisError || 'AI 서버(포트 8000)를 실행한 뒤 다시 업로드해 주세요.'}
+          </Text>
+        </View>
+      ) : null}
+
       {isMockEngine ? (
         <View style={styles.mockNotice}>
           <Text style={styles.mockNoticeText}>
@@ -239,7 +242,7 @@ export default function ProgressScreen({ token, onBack }) {
               <Text style={styles.latestScore}>Class {Number(latest.category) || '-'}</Text>
               <Text style={styles.latestScoreLabel}>예측 클래스</Text>
               <View style={{ marginTop: 8 }}>
-                <CategoryBadge category={latest.category} />
+                <CategoryBadge category={latest.category} patternType={patternType} />
               </View>
               <Text style={styles.latestDate}>{formatFullDate(latest.analyzedAt)}</Text>
             </View>
@@ -278,13 +281,13 @@ export default function ProgressScreen({ token, onBack }) {
             <View style={styles.compareBox}>
               <Text style={styles.compareLabel}>이전</Text>
               <Text style={styles.compareScore}>C{beforeAfter.before}</Text>
-              <CategoryBadge category={beforeAfter.before} />
+              <CategoryBadge category={beforeAfter.before} patternType={patternType} />
             </View>
             <Text style={styles.compareArrow}>→</Text>
             <View style={styles.compareBox}>
               <Text style={styles.compareLabel}>최신</Text>
               <Text style={styles.compareScore}>C{beforeAfter.after}</Text>
-              <CategoryBadge category={beforeAfter.after} />
+              <CategoryBadge category={beforeAfter.after} patternType={patternType} />
             </View>
           </View>
           <Text
@@ -352,7 +355,7 @@ export default function ProgressScreen({ token, onBack }) {
               <Text style={styles.historyDate}>{formatFullDate(item.analyzedAt)}</Text>
               <View style={styles.historyRight}>
                 <Text style={styles.historyScore}>C{Number(item.category) || 0}</Text>
-                <CategoryBadge category={item.category} />
+                <CategoryBadge category={item.category} patternType={patternType} />
               </View>
             </View>
           ))}

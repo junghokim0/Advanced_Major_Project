@@ -3,7 +3,7 @@ import os
 import random
 import time
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from PIL import Image, UnidentifiedImageError
 import torch
 import torch.nn as nn
@@ -139,9 +139,14 @@ def analyze_with_model(bundle: dict, pil_image: Image.Image, pattern_type: str):
     class2 = float(probabilities[1].item())
     class3 = float(probabilities[2].item())
     raw_predicted_class = int(torch.argmax(probabilities).item()) + 1
-    predicted_class, corrected, correction_reason = apply_user_perception_correction(
-        raw_predicted_class, class1, class2, class3
-    )
+    if pattern_type == PATTERN_CROWN:
+        predicted_class, corrected, correction_reason = apply_user_perception_correction(
+            raw_predicted_class, class1, class2, class3
+        )
+    else:
+        predicted_class = raw_predicted_class
+        corrected = False
+        correction_reason = None
 
     return build_analysis_response(
         pattern_type=pattern_type,
@@ -210,9 +215,10 @@ def health():
 @app.post("/analyze")
 async def analyze(
     image: UploadFile = File(...),
-    patternType: str = Form(PATTERN_CROWN),
+    patternType: str | None = Form(None),
+    pattern_type_query: str | None = Query(None, alias="patternType"),
 ):
-    pattern_type = normalize_pattern_type(patternType)
+    pattern_type = normalize_pattern_type(patternType or pattern_type_query or PATTERN_CROWN)
 
     raw = await image.read()
     if not raw:

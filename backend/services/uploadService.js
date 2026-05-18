@@ -6,7 +6,18 @@ const analysisRepository = require('../repositories/analysisRepository');
 const { normalizePatternType } = require('../utils/patternType');
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
-const AI_SERVER_TIMEOUT_MS = Number(process.env.AI_SERVER_TIMEOUT_MS || 10000);
+const AI_SERVER_TIMEOUT_MS = Number(process.env.AI_SERVER_TIMEOUT_MS || 30000);
+
+const formatAiError = (error) => {
+  if (error.response) {
+    const detail = error.response.data?.detail || error.response.data?.error || error.response.data;
+    return `AI HTTP ${error.response.status}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`;
+  }
+  if (error.code) {
+    return `${error.code}: ${error.message || 'AI server unreachable'}`;
+  }
+  return error.message || 'AI analysis failed';
+};
 
 const normalizeProbabilities = (probabilities) => {
   const class1 = Number(probabilities?.class1);
@@ -44,10 +55,18 @@ const requestAIServer = async (file, patternType) => {
   });
   formData.append('patternType', patternType);
 
-  const response = await axios.post(`${AI_SERVER_URL}/analyze`, formData, {
+  const analyzeUrl = `${AI_SERVER_URL}/analyze?patternType=${encodeURIComponent(patternType)}`;
+  const response = await axios.post(analyzeUrl, formData, {
     headers: formData.getHeaders(),
     timeout: AI_SERVER_TIMEOUT_MS,
   });
+
+  const aiPatternType = response.data?.patternType;
+  if (aiPatternType && aiPatternType !== patternType) {
+    console.warn(
+      `[Upload] AI patternType mismatch: requested=${patternType}, response=${aiPatternType}`
+    );
+  }
 
   const predictedClass = Number(response.data?.predictedClass);
   const rawPredictedClass = Number(response.data?.rawPredictedClass ?? predictedClass);
@@ -65,6 +84,7 @@ const requestAIServer = async (file, patternType) => {
   }
 
   return {
+    patternType: aiPatternType || patternType,
     predictedClass,
     rawPredictedClass,
     probabilities,
@@ -82,6 +102,7 @@ exports.processUpload = async (file, user, patternTypeInput) => {
   }
 
   const patternType = normalizePatternType(patternTypeInput);
+  console.log(`[Upload] AI analyze patternType=${patternType} url=${AI_SERVER_URL}`);
 
   const uploadId = await uploadRepository.saveUploadRecord({
     filename: file.filename,
@@ -93,10 +114,18 @@ exports.processUpload = async (file, user, patternTypeInput) => {
   });
 
   let analysisResult = null;
+  let analysisError = null;
   try {
     const aiResponse = await requestAIServer(file, patternType);
-    const { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason, engine } =
-      aiResponse;
+    const {
+      patternType: aiPatternType,
+      predictedClass,
+      rawPredictedClass,
+      probabilities,
+      corrected,
+      correctionReason,
+      engine,
+    } = aiResponse;
     const confidence = Math.max(probabilities.class1, probabilities.class2, probabilities.class3);
     const resultStage = `class-${predictedClass}`;
 
@@ -107,7 +136,7 @@ exports.processUpload = async (file, user, patternTypeInput) => {
     });
 
     analysisResult = {
-      patternType,
+      patternType: aiPatternType,
       engine,
       rawPredictedClass,
       predictedClass,
@@ -117,11 +146,14 @@ exports.processUpload = async (file, user, patternTypeInput) => {
       correctionReason,
     };
   } catch (aiError) {
-    console.error('AI analysis failed:', aiError.message);
+    analysisError = formatAiError(aiError);
+    console.error('AI analysis failed:', analysisError);
   }
 
   return {
-    message: 'Image uploaded successfully.',
+    message: analysisResult
+      ? 'Image uploaded and analyzed successfully.'
+      : 'Image uploaded, but analysis failed.',
     uploadId,
     patternType,
     filename: file.filename,
@@ -131,5 +163,7 @@ exports.processUpload = async (file, user, patternTypeInput) => {
     uploadedBy: user.email,
     uploadedAt: new Date().toISOString(),
     analysis: analysisResult,
+    analysisStatus: analysisResult ? 'success' : 'failed',
+    analysisError,
   };
 };

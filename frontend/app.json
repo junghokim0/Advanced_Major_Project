@@ -12,14 +12,27 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "이마·헤어라인(M자) 촬영을 위해 카메라 접근이 필요합니다.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": ["android.permission.CAMERA"]
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "이마·헤어라인(M자) 촬영을 위해 카메라 접근이 필요합니다."
+      }
     },
     "assetBundlePatterns": ["**/*"]
   }
