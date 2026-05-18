@@ -24,6 +24,16 @@ const COLORS = {
 };
 const RADIUS = { card: 12, button: 12 };
 
+const PATTERN_OPTIONS = [
+  { value: 'crown', label: '정수리' },
+  { value: 'm_line', label: 'M자' },
+];
+
+function getPatternLabel(patternType) {
+  if (patternType === 'm_line') return 'M자';
+  return '정수리';
+}
+
 function getCategoryMeta(category) {
   if (Number(category) === 1) return { label: '정상 단계', color: COLORS.medical600, bg: COLORS.medical50 };
   if (Number(category) === 2) return { label: '의심 단계', color: COLORS.amber500, bg: COLORS.amber50 };
@@ -96,12 +106,19 @@ function CategoryBadge({ category }) {
 export default function ProgressScreen({ token, onBack }) {
   const [error, setError] = useState(null);
   const { historyLoading, setHistoryLoading, history, setHistory, latestResult } = useAnalysis();
+  const [patternType, setPatternType] = useState(latestResult?.patternType || 'crown');
+
+  useEffect(() => {
+    if (latestResult?.patternType) {
+      setPatternType(latestResult.patternType);
+    }
+  }, [latestResult?.patternType]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     setError(null);
     try {
-      const response = await getAnalysisHistory(token);
+      const response = await getAnalysisHistory(token, patternType);
       const items = Array.isArray(response.data) ? response.data : [];
       setHistory(items.slice(0, 12));
     } catch (err) {
@@ -109,7 +126,7 @@ export default function ProgressScreen({ token, onBack }) {
     } finally {
       setHistoryLoading(false);
     }
-  }, [token, setHistoryLoading, setHistory]);
+  }, [token, patternType, setHistoryLoading, setHistory]);
 
   useEffect(() => {
     loadHistory();
@@ -143,6 +160,7 @@ export default function ProgressScreen({ token, onBack }) {
 
   const latest = history[0] || null;
   const recentList = history.slice(0, 6);
+  const isMockEngine = latestResult?.analysis?.engine === 'mock';
   const correctionReason = latestResult?.analysis?.corrected ? latestResult?.analysis?.correctionReason : null;
   const latestClassProbabilities = latestResult?.analysis?.probabilities || null;
   const classProbabilityRows = latestClassProbabilities
@@ -162,12 +180,40 @@ export default function ProgressScreen({ token, onBack }) {
       <View style={styles.header}>
         <View style={styles.headerTextWrap}>
           <Text style={styles.title}>분석 결과</Text>
-          <Text style={styles.subtitle}>최근 1년 변화</Text>
+          <Text style={styles.subtitle}>
+            {getPatternLabel(patternType)} · 최근 1년 변화
+          </Text>
         </View>
         <TouchableOpacity style={styles.retryButton} onPress={onBack} activeOpacity={0.85}>
           <Text style={styles.retryButtonText}>다시 분석하기</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.patternRow}>
+        {PATTERN_OPTIONS.map((option) => {
+          const selected = patternType === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.patternChip, selected && styles.patternChipSelected]}
+              onPress={() => setPatternType(option.value)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.patternChipText, selected && styles.patternChipTextSelected]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {isMockEngine ? (
+        <View style={styles.mockNotice}>
+          <Text style={styles.mockNoticeText}>
+            M자 분석은 학습 모델 완성 전까지 임시(mock) 결과입니다.
+          </Text>
+        </View>
+      ) : null}
 
       {historyLoading ? <ActivityIndicator style={styles.loader} color={COLORS.medical600} /> : null}
       {error ? (
@@ -178,8 +224,10 @@ export default function ProgressScreen({ token, onBack }) {
 
       {!historyLoading && !error && !history.length ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>최근 1년 내 분석 이력이 없습니다</Text>
-          <Text style={styles.emptyHint}>업로드 화면에서 사진을 분석해 보세요</Text>
+          <Text style={styles.emptyTitle}>
+            {getPatternLabel(patternType)} 분석 이력이 없습니다
+          </Text>
+          <Text style={styles.emptyHint}>업로드 화면에서 해당 패턴으로 사진을 분석해 보세요</Text>
         </View>
       ) : null}
 
@@ -360,6 +408,44 @@ const styles = StyleSheet.create({
     color: COLORS.neutral500,
     marginTop: 2,
     fontSize: 13,
+  },
+  patternRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  patternChip: {
+    borderWidth: 1,
+    borderColor: COLORS.neutral200,
+    backgroundColor: COLORS.white,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  patternChipSelected: {
+    borderColor: COLORS.medical600,
+    backgroundColor: COLORS.medical50,
+  },
+  patternChipText: {
+    color: COLORS.neutral700,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  patternChipTextSelected: {
+    color: COLORS.medical700,
+  },
+  mockNotice: {
+    backgroundColor: COLORS.amber50,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  mockNoticeText: {
+    color: '#92400e',
+    fontSize: 12,
+    lineHeight: 18,
   },
   retryButton: {
     borderWidth: 1,

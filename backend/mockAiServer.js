@@ -1,3 +1,7 @@
+/**
+ * @deprecated 통합 AI 서버(ai/api_server.py)의 m_line 내부 mock을 사용합니다.
+ * 레거시/단독 테스트용으로만 유지합니다.
+ */
 const express = require('express');
 const multer = require('multer');
 

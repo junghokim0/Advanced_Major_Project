@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { VALID_PATTERN_TYPES } = require('../utils/patternType');
 
 exports.saveAnalysisResult = async ({ uploadId, resultStage, probability }) => {
   const [result] = await db.execute(
@@ -9,12 +10,26 @@ exports.saveAnalysisResult = async ({ uploadId, resultStage, probability }) => {
   return result.insertId;
 };
 
-exports.getAnalysisHistoryByUserId = async (userId) => {
+exports.getAnalysisHistoryByUserId = async (userId, patternType = null) => {
+  const params = [userId];
+  let patternFilter = '';
+
+  if (patternType) {
+    if (!VALID_PATTERN_TYPES.includes(patternType)) {
+      const error = new Error(`Invalid patternType. Use one of: ${VALID_PATTERN_TYPES.join(', ')}`);
+      error.status = 400;
+      throw error;
+    }
+    patternFilter = ' AND u.pattern_type = ?';
+    params.push(patternType);
+  }
+
   const [rows] = await db.query(
     `SELECT 
       ah.id as analysisId,
       ah.result_stage as resultStage,
       ah.probability,
+      u.pattern_type as patternType,
       CASE
         WHEN ah.result_stage = 'class-1' THEN 1
         WHEN ah.result_stage = 'class-2' THEN 2
@@ -31,8 +46,9 @@ exports.getAnalysisHistoryByUserId = async (userId) => {
     JOIN uploads u ON ah.upload_id = u.id
     WHERE u.user_id = ?
       AND ah.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+      ${patternFilter}
     ORDER BY ah.created_at DESC`,
-    [userId]
+    params
   );
 
   return rows;

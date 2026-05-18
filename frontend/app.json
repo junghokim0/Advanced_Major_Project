@@ -1,11 +1,26 @@
 {
   "expo": {
-    "name": "Frontend",
-    "slug": "frontend",
+    "name": "두피 분석 - MOJI",
+    "slug": "hair-analysis",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
+    "icon": "./assets/logo.png",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "ios": {
+      "supportsTablet": true
+    },
     "assetBundlePatterns": ["**/*"]
   }
 }

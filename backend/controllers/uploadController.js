@@ -75,7 +75,7 @@ exports.uploadImage = async (req, res, next) => {
       mimetype: file.mimetype,
     });
 
-    const result = await uploadService.processUpload(file, req.user);
+    const result = await uploadService.processUpload(file, req.user, req.body.patternType);
     res.json(result);
   } catch (error) {
     console.error('Upload error:', error);

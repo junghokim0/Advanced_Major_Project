@@ -3,8 +3,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const uploadRepository = require('../repositories/uploadRepository');
 const analysisRepository = require('../repositories/analysisRepository');
+const { normalizePatternType } = require('../utils/patternType');
 
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:5001';
+const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 const AI_SERVER_TIMEOUT_MS = Number(process.env.AI_SERVER_TIMEOUT_MS || 10000);
 
 const normalizeProbabilities = (probabilities) => {
@@ -35,12 +36,13 @@ const normalizeProbabilities = (probabilities) => {
   };
 };
 
-const requestAIServer = async (file) => {
+const requestAIServer = async (file, patternType) => {
   const formData = new FormData();
   formData.append('image', fs.createReadStream(file.path), {
     filename: file.originalname,
     contentType: file.mimetype,
   });
+  formData.append('patternType', patternType);
 
   const response = await axios.post(`${AI_SERVER_URL}/analyze`, formData, {
     headers: formData.getHeaders(),
@@ -53,6 +55,7 @@ const requestAIServer = async (file) => {
   const corrected = Boolean(response.data?.corrected);
   const correctionReason =
     typeof response.data?.correctionReason === 'string' ? response.data.correctionReason : null;
+  const engine = typeof response.data?.engine === 'string' ? response.data.engine : null;
 
   if (!Number.isInteger(predictedClass) || predictedClass < 1 || predictedClass > 3) {
     throw new Error('Invalid AI response predictedClass.');
@@ -61,33 +64,42 @@ const requestAIServer = async (file) => {
     throw new Error('Invalid AI response rawPredictedClass.');
   }
 
-  return { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason };
+  return {
+    predictedClass,
+    rawPredictedClass,
+    probabilities,
+    corrected,
+    correctionReason,
+    engine,
+  };
 };
 
-exports.processUpload = async (file, user) => {
+exports.processUpload = async (file, user, patternTypeInput) => {
   if (!file) {
     const error = new Error('No file uploaded.');
     error.status = 400;
     throw error;
   }
 
+  const patternType = normalizePatternType(patternTypeInput);
+
   const uploadId = await uploadRepository.saveUploadRecord({
     filename: file.filename,
     originalname: file.originalname,
     size: file.size,
     mimetype: file.mimetype,
+    patternType,
     userId: user.userId,
   });
 
-  // AI 서버에 파일을 전달해 점수(1~100)를 받는다.
   let analysisResult = null;
   try {
-    const aiResponse = await requestAIServer(file);
-    const { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason } = aiResponse;
+    const aiResponse = await requestAIServer(file, patternType);
+    const { predictedClass, rawPredictedClass, probabilities, corrected, correctionReason, engine } =
+      aiResponse;
     const confidence = Math.max(probabilities.class1, probabilities.class2, probabilities.class3);
     const resultStage = `class-${predictedClass}`;
 
-    // 기존 DB 스키마를 유지하기 위해 predictedClass/confidence를 저장.
     await analysisRepository.saveAnalysisResult({
       uploadId,
       resultStage,
@@ -95,6 +107,8 @@ exports.processUpload = async (file, user) => {
     });
 
     analysisResult = {
+      patternType,
+      engine,
       rawPredictedClass,
       predictedClass,
       confidence,
@@ -104,12 +118,12 @@ exports.processUpload = async (file, user) => {
     };
   } catch (aiError) {
     console.error('AI analysis failed:', aiError.message);
-    // AI 실패 시에도 업로드는 성공으로 처리
   }
 
   return {
     message: 'Image uploaded successfully.',
     uploadId,
+    patternType,
     filename: file.filename,
     originalname: file.originalname,
     size: file.size,

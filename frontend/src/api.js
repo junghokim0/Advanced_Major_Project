@@ -75,7 +75,7 @@ export async function signup(email, password) {
   return response.json();
 }
 
-export async function uploadImage(token, image) {
+export async function uploadImage(token, image, patternType = 'crown') {
   const fileResponse = await fetch(image.uri);
   const blob = await fileResponse.blob();
 
@@ -99,6 +99,7 @@ export async function uploadImage(token, image) {
       file: base64,
       filename: image.fileName || `photo.${image.uri.split('.').pop() || 'jpg'}`,
       mimetype: image.type || 'image/jpeg',
+      patternType,
     }),
   });
 
@@ -110,8 +111,9 @@ export async function uploadImage(token, image) {
   return response.json();
 }
 
-export async function getAnalysisHistory(token) {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/analysis/history`, {
+export async function getAnalysisHistory(token, patternType = null) {
+  const query = patternType ? `?patternType=${encodeURIComponent(patternType)}` : '';
+  const response = await fetchWithTimeout(`${API_BASE_URL}/analysis/history${query}`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,

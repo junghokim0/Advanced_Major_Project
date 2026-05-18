@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "start:ai-mock": "node mockAiServer.js"
+    "start:ai-mock": "node mockAiServer.js",
+    "start:ai-mock:legacy": "node mockAiServer.js"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -19,8 +19,14 @@ const COLORS = {
 };
 const RADIUS = { card: 12, button: 12, image: 12 };
 
+const PATTERN_OPTIONS = [
+  { value: 'crown', label: '정수리', hint: '윗면 두피 촬영' },
+  { value: 'm_line', label: 'M자', hint: '이마·헤어라인 촬영' },
+];
+
 export default function UploadScreen({ token, userEmail, onLogout, onOpenProgress }) {
   const [image, setImage] = useState(null);
+  const [patternType, setPatternType] = useState('crown');
   const [error, setError] = useState(null);
   const { uploading, setUploading, latestResult, setLatestResult } = useAnalysis();
 
@@ -76,7 +82,7 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
     setError(null);
 
     try {
-      const response = await uploadImage(token, image);
+      const response = await uploadImage(token, image, patternType);
       setLatestResult(response);
       onOpenProgress();
     } catch (err) {
@@ -91,6 +97,34 @@ export default function UploadScreen({ token, userEmail, onLogout, onOpenProgres
       <View style={styles.header}>
         <Text style={styles.title}>사진 업로드</Text>
         <Text style={styles.subtitle}>Logged in as {userEmail}</Text>
+      </View>
+
+      <View style={styles.patternSection}>
+        <Text style={styles.patternTitle}>분석 패턴</Text>
+        <View style={styles.patternRow}>
+          {PATTERN_OPTIONS.map((option) => {
+            const selected = patternType === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.patternCard, selected && styles.patternCardSelected]}
+                onPress={() => setPatternType(option.value)}
+                activeOpacity={0.85}
+                disabled={uploading}
+              >
+                <Text style={[styles.patternLabel, selected && styles.patternLabelSelected]}>
+                  {option.label}
+                </Text>
+                <Text style={[styles.patternHint, selected && styles.patternHintSelected]}>
+                  {option.hint}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {patternType === 'm_line' ? (
+          <Text style={styles.patternNotice}>M자 모델 학습 전까지 임시(mock) 분석이 적용됩니다.</Text>
+        ) : null}
       </View>
 
       <View style={styles.actionRow}>
@@ -158,6 +192,56 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 16,
+  },
+  patternSection: {
+    marginBottom: 16,
+  },
+  patternTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.neutral800,
+    marginBottom: 8,
+  },
+  patternRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  patternCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.neutral200,
+    borderRadius: RADIUS.card,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  patternCardSelected: {
+    borderColor: COLORS.medical600,
+    backgroundColor: COLORS.medical50,
+  },
+  patternLabel: {
+    color: COLORS.neutral800,
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  patternLabelSelected: {
+    color: COLORS.medical700,
+  },
+  patternHint: {
+    color: COLORS.neutral500,
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  patternHintSelected: {
+    color: COLORS.medical700,
+  },
+  patternNotice: {
+    marginTop: 8,
+    color: COLORS.neutral500,
+    fontSize: 12,
+    lineHeight: 18,
   },
   title: {
     fontSize: 28,

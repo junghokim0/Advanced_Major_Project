@@ -12,6 +12,7 @@ CREATE TABLE uploads (
   originalname VARCHAR(255) NOT NULL,
   size INT UNSIGNED NOT NULL,
   mimetype VARCHAR(100) NOT NULL,
+  pattern_type ENUM('crown', 'm_line') NOT NULL DEFAULT 'crown',
   user_id INT UNSIGNED NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
