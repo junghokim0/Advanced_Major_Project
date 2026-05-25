@@ -11,33 +11,43 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CaptureGuideOverlay from '../components/CaptureGuideOverlay';
 import LevelIndicator from '../components/LevelIndicator';
-import { CAPTURE_IMAGE_QUALITY } from '../constants/captureConfig';
-import { M_LINE_GUIDE } from '../constants/guideLayouts';
+import { CAPTURE_IMAGE_QUALITY, PATTERN_CAPTURE_CONFIG } from '../constants/captureConfig';
+import { CROWN_GUIDE, M_LINE_GUIDE } from '../constants/guideLayouts';
 import { useDeviceLevel } from '../hooks/useDeviceLevel';
 import { BRAND } from '../theme/brand';
 import { cropImageToGuideRegion } from '../utils/cropGuideRegion';
 
-export default function CameraCaptureScreen({ onCapture, onCancel }) {
+const GUIDE_BY_PATTERN = {
+  crown: CROWN_GUIDE,
+  m_line: M_LINE_GUIDE,
+};
+
+const DEFAULT_PATTERN_TYPE = 'm_line';
+
+export default function CameraCaptureScreen({
+  patternType = DEFAULT_PATTERN_TYPE,
+  onCapture,
+  onCancel,
+}) {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [capturing, setCapturing] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ width: 0, height: 0 });
+  const mode = PATTERN_CAPTURE_CONFIG[patternType] || PATTERN_CAPTURE_CONFIG[DEFAULT_PATTERN_TYPE];
+  const guide = GUIDE_BY_PATTERN[patternType] || GUIDE_BY_PATTERN[DEFAULT_PATTERN_TYPE];
   const {
-    tilt,
     isLevel,
     poseHint,
     isAvailable,
-    targetPitchDeg,
-    pitchToleranceDeg,
-    rollThresholdDeg,
-  } = useDeviceLevel();
+    detailText,
+  } = useDeviceLevel(mode.levelConfig);
 
-  const canCapture = isLevel && !capturing;
+  const canCapture = !capturing;
 
   const handleCapture = async () => {
-    if (!cameraRef.current || !canCapture) return;
+    if (!cameraRef.current || capturing) return;
 
     setCapturing(true);
     setCameraError(null);
@@ -49,21 +59,28 @@ export default function CameraCaptureScreen({ onCapture, onCancel }) {
         throw new Error('사진을 저장하지 못했습니다.');
       }
 
-      const cropped = await cropImageToGuideRegion(
-        photo.uri,
-        photo.width,
-        photo.height,
-        M_LINE_GUIDE
-      );
-
-      onCapture({
-        uri: cropped.uri,
-        width: cropped.width,
-        height: cropped.height,
+      let asset = {
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
         type: 'image/jpeg',
-        croppedToGuide: true,
-        patternType: 'm_line',
-      });
+        croppedToGuide: false,
+        patternType,
+      };
+
+      if (mode.cropToGuide && guide) {
+        const cropped = await cropImageToGuideRegion(photo.uri, photo.width, photo.height, guide);
+        asset = {
+          uri: cropped.uri,
+          width: cropped.width,
+          height: cropped.height,
+          type: 'image/jpeg',
+          croppedToGuide: true,
+          patternType,
+        };
+      }
+
+      onCapture(asset);
     } catch (err) {
       setCameraError(err.message || '촬영에 실패했습니다.');
     } finally {
@@ -83,7 +100,7 @@ export default function CameraCaptureScreen({ onCapture, onCancel }) {
     return (
       <View style={styles.centered}>
         <Text style={styles.permissionTitle}>카메라 권한이 필요합니다</Text>
-        <Text style={styles.permissionHint}>M자 라인 촬영을 위해 카메라 접근을 허용해 주세요.</Text>
+        <Text style={styles.permissionHint}>{mode.permissionHint}</Text>
         <TouchableOpacity style={styles.primaryButton} onPress={requestPermission} activeOpacity={0.85}>
           <Text style={styles.primaryButtonText}>권한 허용</Text>
         </TouchableOpacity>
@@ -115,13 +132,9 @@ export default function CameraCaptureScreen({ onCapture, onCancel }) {
           setPreviewLayout({ width, height });
         }}
       >
-        <CameraView ref={cameraRef} style={styles.camera} facing="front" mode="picture" />
+        <CameraView ref={cameraRef} style={styles.camera} facing={mode.cameraFacing} mode="picture" />
         {previewLayout.width > 0 && previewLayout.height > 0 ? (
-          <CaptureGuideOverlay
-            width={previewLayout.width}
-            height={previewLayout.height}
-            guide={M_LINE_GUIDE}
-          />
+          <CaptureGuideOverlay width={previewLayout.width} height={previewLayout.height} guide={guide} />
         ) : null}
       </View>
 
@@ -129,24 +142,25 @@ export default function CameraCaptureScreen({ onCapture, onCancel }) {
         <TouchableOpacity style={styles.backButton} onPress={onCancel} activeOpacity={0.85}>
           <Text style={styles.backButtonText}>← 취소</Text>
         </TouchableOpacity>
-        <Text style={styles.topTitle}>M자 촬영</Text>
+        <Text style={styles.topTitle}>{mode.title}</Text>
         <View style={styles.topSpacer} />
       </View>
 
       <View style={[styles.overlayBottom, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
-        <Text style={styles.hint}>
-          폰 상단을 이마 쪽으로 기울이고(목표 pitch 약 -10°), 타원 안에 맞춘 뒤 촬영하면 가이드 영역만 전송됩니다.
-        </Text>
+        <Text style={styles.hint}>{mode.bottomHint}</Text>
         <LevelIndicator
           isLevel={isLevel}
-          roll={tilt.roll}
-          pitch={tilt.pitch}
           poseHint={poseHint}
           sensorAvailable={isAvailable}
-          targetPitchDeg={targetPitchDeg}
-          pitchToleranceDeg={pitchToleranceDeg}
-          rollThresholdDeg={rollThresholdDeg}
+          detailText={detailText}
         />
+        <Text style={[styles.captureGuideText, isLevel && styles.captureGuideTextReady]}>
+          {isAvailable
+            ? isLevel
+              ? '가이드와 자세를 확인한 뒤 원하는 순간 직접 촬영해 주세요.'
+              : '가이드를 참고해 위치를 맞춘 뒤 직접 촬영해 주세요.'
+            : '센서를 사용할 수 없어 가이드만 표시됩니다. 원하는 순간 직접 촬영해 주세요.'}
+        </Text>
         {cameraError ? <Text style={styles.errorText}>{cameraError}</Text> : null}
         <TouchableOpacity
           style={[styles.captureButton, !canCapture && styles.captureButtonDisabled]}
@@ -267,8 +281,18 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#fecaca',
     fontSize: 13,
-    marginBottom: 8,
+    marginTop: 8,
     textAlign: 'center',
+  },
+  captureGuideText: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  captureGuideTextReady: {
+    color: '#bbf7d0',
   },
   captureButton: {
     width: 72,

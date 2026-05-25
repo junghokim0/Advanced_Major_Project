@@ -71,7 +71,11 @@ function MainTabs({ token, userEmail, onLogout, pendingCapture, onPendingCapture
             token={token}
             pendingCapture={pendingCapture}
             onPendingCaptureHandled={onPendingCaptureHandled}
-            onOpenCustomCamera={() => props.navigation.getParent()?.navigate('Camera')}
+            onOpenCustomCamera={(patternType) =>
+              props.navigation.getParent()?.navigate('Camera', {
+                patternType: patternType || 'm_line',
+              })
+            }
           />
         )}
       </Tab.Screen>
@@ -124,8 +128,9 @@ export default function MainNavigator({
           name="Camera"
           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
         >
-          {({ navigation }) => (
+          {({ navigation, route }) => (
             <CameraCaptureScreen
+              patternType={route.params?.patternType || 'm_line'}
               onCapture={(asset) => {
                 onPendingCapture(asset);
                 navigation.goBack();

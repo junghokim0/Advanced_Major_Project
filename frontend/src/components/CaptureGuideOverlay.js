@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Ellipse, Mask, Rect } from 'react-native-svg';
-import { M_LINE_GUIDE_HINT, resolveGuideEllipse } from '../constants/guideLayouts';
+import { resolveGuideEllipse } from '../constants/guideLayouts';
 
 export default function CaptureGuideOverlay({ width, height, guide }) {
   if (!width || !height || !guide) {
@@ -10,6 +10,7 @@ export default function CaptureGuideOverlay({ width, height, guide }) {
 
   const { cx, cy, rx, ry } = resolveGuideEllipse(guide, width, height);
   const dimColor = `rgba(0,0,0,${guide.dimOpacity ?? 0.38})`;
+  const hint = guide.hint;
 
   return (
     <View style={styles.container} pointerEvents="none">
@@ -31,7 +32,7 @@ export default function CaptureGuideOverlay({ width, height, guide }) {
           fill="transparent"
         />
       </Svg>
-      <Text style={[styles.hint, { top: Math.max(8, cy - ry - 36) }]}>{M_LINE_GUIDE_HINT}</Text>
+      {hint ? <Text style={[styles.hint, { top: Math.max(8, cy - ry - 36) }]}>{hint}</Text> : null}
     </View>
   );
 }

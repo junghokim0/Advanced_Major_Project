@@ -4,13 +4,9 @@ import { BRAND } from '../theme/brand';
 
 export default function LevelIndicator({
   isLevel,
-  roll,
-  pitch,
   poseHint,
   sensorAvailable,
-  targetPitchDeg,
-  pitchToleranceDeg,
-  rollThresholdDeg,
+  detailText,
 }) {
   const lineColor = isLevel ? BRAND.medical600 : BRAND.red500;
 
@@ -26,12 +22,7 @@ export default function LevelIndicator({
       <Text style={[styles.status, { color: lineColor }]}>
         {sensorAvailable ? poseHint : '센서 없음 — 촬영 가능'}
       </Text>
-      {sensorAvailable ? (
-        <Text style={styles.detail}>
-          좌우 {roll}° (±{rollThresholdDeg}°) · 앞뒤 {pitch}° (목표 {targetPitchDeg}° ±
-          {pitchToleranceDeg}°)
-        </Text>
-      ) : null}
+      {sensorAvailable && detailText ? <Text style={styles.detail}>{detailText}</Text> : null}
     </View>
   );
 }

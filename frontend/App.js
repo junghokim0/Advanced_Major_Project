@@ -4,6 +4,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
 import MainNavigator from './src/navigation/MainNavigator';
 import { AnalysisProvider, useAnalysis } from './src/context/AnalysisContext';
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const INTRO_SPLASH_MS = 1800;
