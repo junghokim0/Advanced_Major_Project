@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const uploadService = require('../services/uploadService');
+const { validateUploadBuffer } = require('../utils/uploadImageValidation');
 
 const detectMimeType = (filename = '') => {
   const ext = path.extname(filename).toLowerCase();
@@ -26,9 +27,26 @@ exports.uploadImage = async (req, res, next) => {
         return next(error);
       }
 
-      // Base64를 버퍼로 변환
-      const buffer = Buffer.from(base64String, 'base64');
-      
+      let buffer;
+      try {
+        buffer = Buffer.from(base64String, 'base64');
+      } catch {
+        const error = new Error('잘못된 이미지 데이터 형식입니다.');
+        error.status = 400;
+        return next(error);
+      }
+
+      const validation = validateUploadBuffer(
+        buffer,
+        mimetype,
+        filename || 'photo.jpg'
+      );
+      if (!validation.ok) {
+        const error = new Error(validation.error);
+        error.status = 400;
+        return next(error);
+      }
+
       // 임시 파일로 저장
       const uploadsDir = path.join(__dirname, '../uploads');
       if (!fs.existsSync(uploadsDir)) {
@@ -64,6 +82,23 @@ exports.uploadImage = async (req, res, next) => {
     // FormData 업로드인 경우
     if (!file) {
       const error = new Error('No file uploaded.');
+      error.status = 400;
+      return next(error);
+    }
+
+    const fileBuffer = fs.readFileSync(file.path);
+    const fileValidation = validateUploadBuffer(
+      fileBuffer,
+      file.mimetype,
+      file.originalname
+    );
+    if (!fileValidation.ok) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch {
+        // ignore
+      }
+      const error = new Error(fileValidation.error);
       error.status = 400;
       return next(error);
     }

@@ -19,6 +19,12 @@
           "cameraPermission": "이마·헤어라인(M자) 촬영을 위해 카메라 접근이 필요합니다.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "주변 병원·약국 안내를 위해 현재 위치로 네이버 지도를 열 때 사용합니다."
+        }
       ]
     ],
     "android": {
@@ -26,12 +32,18 @@
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "이마·헤어라인(M자) 촬영을 위해 카메라 접근이 필요합니다."
+        "NSCameraUsageDescription": "이마·헤어라인(M자) 촬영을 위해 카메라 접근이 필요합니다.",
+        "NSLocationWhenInUseUsageDescription": "주변 병원·약국 안내를 위해 현재 위치로 네이버 지도를 열 때 사용합니다.",
+        "LSApplicationQueriesSchemes": ["nmap"]
       }
     },
     "assetBundlePatterns": ["**/*"]

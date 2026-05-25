@@ -25,9 +25,10 @@ DEFAULT_CROWN_MODEL_PATH = os.path.join(
 )
 DEFAULT_MLINE_MODEL_PATH = os.path.join(
     os.path.dirname(__file__),
-    "bestmodel",
-    "best_model_mline.pth",
+    "forhead",
+    "best_model_forehead.pth",
 )
+MLINE_NUM_CLASSES = 2
 
 
 def create_model(num_classes: int = 3) -> nn.Module:
@@ -50,12 +51,12 @@ def get_transform() -> transforms.Compose:
     )
 
 
-def load_model_bundle(model_path: str):
+def load_model_bundle(model_path: str, num_classes: int = 3):
     if not os.path.exists(model_path):
         return None
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = create_model(num_classes=3)
+    model = create_model(num_classes=num_classes)
     state = torch.load(model_path, map_location=device)
     model.load_state_dict(state)
     model.to(device)
@@ -66,6 +67,7 @@ def load_model_bundle(model_path: str):
         "model": model,
         "transform": get_transform(),
         "model_path": model_path,
+        "num_classes": num_classes,
     }
 
 
@@ -122,6 +124,41 @@ def build_analysis_response(
         "corrected": corrected,
         "correctionReason": correction_reason,
     }
+
+
+def analyze_with_forehead_model(bundle: dict, pil_image: Image.Image, pattern_type: str):
+    """M자(이마): 2-class — 1_level→class1, 3_level→class3 (class2=0, API 형식은 정수리와 동일)."""
+    transform = bundle["transform"]
+    model = bundle["model"]
+    device = bundle["device"]
+
+    input_tensor = transform(pil_image).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        outputs = model(input_tensor)
+        probabilities = F.softmax(outputs, dim=1)[0]
+
+    level1_prob = float(probabilities[0].item())
+    level3_prob = float(probabilities[1].item())
+    class1 = level1_prob
+    class2 = 0.0
+    class3 = level3_prob
+
+    raw_idx = int(torch.argmax(probabilities).item())
+    raw_predicted_class = 1 if raw_idx == 0 else 3
+    predicted_class = raw_predicted_class
+
+    return build_analysis_response(
+        pattern_type=pattern_type,
+        raw_predicted_class=raw_predicted_class,
+        predicted_class=predicted_class,
+        class1=class1,
+        class2=class2,
+        class3=class3,
+        corrected=False,
+        correction_reason=None,
+        engine="model",
+    )
 
 
 def analyze_with_model(bundle: dict, pil_image: Image.Image, pattern_type: str):
@@ -188,7 +225,10 @@ if crown_bundle is None:
         f"Crown model file not found: {os.getenv('AI_MODEL_PATH', DEFAULT_CROWN_MODEL_PATH)}"
     )
 
-mline_bundle = load_model_bundle(os.getenv("AI_MLINE_MODEL_PATH", DEFAULT_MLINE_MODEL_PATH))
+mline_bundle = load_model_bundle(
+    os.getenv("AI_MLINE_MODEL_PATH", DEFAULT_MLINE_MODEL_PATH),
+    num_classes=MLINE_NUM_CLASSES,
+)
 
 app = FastAPI(title=APP_TITLE)
 
@@ -206,6 +246,7 @@ def health():
             PATTERN_M_LINE: {
                 "engine": "model" if mline_bundle else "mock",
                 "modelPath": mline_bundle["model_path"] if mline_bundle else None,
+                "numClasses": MLINE_NUM_CLASSES if mline_bundle else None,
             },
         },
         "device": str(crown_bundle["device"]),
@@ -233,7 +274,7 @@ async def analyze(
         return analyze_with_model(crown_bundle, pil_image, pattern_type)
 
     if mline_bundle is not None:
-        return analyze_with_model(mline_bundle, pil_image, pattern_type)
+        return analyze_with_forehead_model(mline_bundle, pil_image, pattern_type)
 
     return analyze_with_mock(pattern_type)
 

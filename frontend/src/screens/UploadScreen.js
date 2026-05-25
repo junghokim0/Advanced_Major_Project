@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../api';
 import { useAnalysis } from '../context/AnalysisContext';
@@ -26,13 +27,11 @@ const PATTERN_OPTIONS = [
 
 export default function UploadScreen({
   token,
-  userEmail,
   pendingCapture,
   onPendingCaptureHandled,
   onOpenCustomCamera,
-  onLogout,
-  onOpenProgress,
 }) {
+  const navigation = useNavigation();
   const [image, setImage] = useState(null);
   const [patternType, setPatternType] = useState('crown');
   const [error, setError] = useState(null);
@@ -117,7 +116,7 @@ export default function UploadScreen({
         setError(`사진은 저장됐지만 분석에 실패했습니다. AI 서버(8000) 실행 후 다시 시도해 주세요.\n${detail}`);
         return;
       }
-      onOpenProgress();
+      navigation.navigate('Records');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -129,7 +128,7 @@ export default function UploadScreen({
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>사진 업로드</Text>
-        <Text style={styles.subtitle}>Logged in as {userEmail}</Text>
+        <Text style={styles.subtitle}>사진을 선택하거나 촬영한 뒤 분석해 주세요</Text>
       </View>
 
       <View style={styles.patternSection}>
@@ -206,12 +205,12 @@ export default function UploadScreen({
         </View>
       ) : null}
 
-      <TouchableOpacity style={styles.outlineButton} onPress={onOpenProgress} activeOpacity={0.85}>
-        <Text style={styles.outlineButtonText}>진행 결과 확인</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={onLogout} activeOpacity={0.7}>
-        <Text style={styles.logoutText}>Log Out</Text>
+      <TouchableOpacity
+        style={styles.outlineButton}
+        onPress={() => navigation.navigate('Records')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.outlineButtonText}>기록 탭에서 결과 보기</Text>
       </TouchableOpacity>
     </ScrollView>
   );

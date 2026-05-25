@@ -3,6 +3,7 @@ const router = express.Router();
 const uploadController = require('../controllers/uploadController');
 const { authenticateToken } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
+const { requireHttpsWhenEnabled } = require('../middlewares/uploadSecurityMiddleware');
 
 const optionalImageUpload = (req, res, next) => {
   const contentType = req.headers['content-type'] || '';
@@ -12,6 +13,12 @@ const optionalImageUpload = (req, res, next) => {
   return next();
 };
 
-router.post('/image', authenticateToken, optionalImageUpload, uploadController.uploadImage);
+router.post(
+  '/image',
+  requireHttpsWhenEnabled,
+  authenticateToken,
+  optionalImageUpload,
+  uploadController.uploadImage
+);
 
 module.exports = router;

@@ -22,6 +22,20 @@ function resolveApiBaseUrl() {
 const API_BASE_URL = resolveApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 10000;
 
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
+export function isApiUsingHttps() {
+  return API_BASE_URL.startsWith('https://');
+}
+
+if (__DEV__ && !isApiUsingHttps()) {
+  console.warn(
+    '[MOJI] 개발 모드: API가 HTTP로 연결됩니다. 운영 배포 시 EXPO_PUBLIC_API_BASE_URL을 https:// 로 설정하세요.'
+  );
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

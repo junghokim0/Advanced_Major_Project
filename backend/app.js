@@ -11,6 +11,10 @@ const { seedDefaultUser } = require('./utils/seedUser');
 
 const app = express();
 
+if (process.env.REQUIRE_HTTPS === 'true') {
+  app.set('trust proxy', 1);
+}
+
 app.use(cors());
 
 app.use(express.json({ limit: '10mb' }));

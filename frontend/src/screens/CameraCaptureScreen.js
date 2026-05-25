@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CaptureGuideOverlay from '../components/CaptureGuideOverlay';
 import LevelIndicator from '../components/LevelIndicator';
 import { CAPTURE_IMAGE_QUALITY } from '../constants/captureConfig';
@@ -17,6 +18,7 @@ import { BRAND } from '../theme/brand';
 import { cropImageToGuideRegion } from '../utils/cropGuideRegion';
 
 export default function CameraCaptureScreen({ onCapture, onCancel }) {
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [capturing, setCapturing] = useState(false);
@@ -131,7 +133,7 @@ export default function CameraCaptureScreen({ onCapture, onCancel }) {
         <View style={styles.topSpacer} />
       </View>
 
-      <View style={styles.overlayBottom}>
+      <View style={[styles.overlayBottom, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
         <Text style={styles.hint}>
           폰 상단을 이마 쪽으로 기울이고(목표 pitch 약 -10°), 타원 안에 맞춘 뒤 촬영하면 가이드 영역만 전송됩니다.
         </Text>
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 40,
+    paddingBottom: 16,
     paddingTop: 16,
     paddingHorizontal: 20,
     backgroundColor: 'rgba(0,0,0,0.45)',

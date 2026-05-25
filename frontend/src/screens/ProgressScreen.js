@@ -1,10 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
 import { getAnalysisHistory } from '../api';
 import { getCategoryMeta, getClassProbabilityLabels } from '../constants/analysisLabels';
+import { getUploadImageUrl } from '../utils/uploadImageUrl';
+import { getClassChangeInterpretation } from '../utils/compareChange';
 import { useAnalysis } from '../context/AnalysisContext';
+import MedicalDisclaimerCard from '../components/MedicalDisclaimerCard';
 
 const COLORS = {
   medical600: '#0d9488',
@@ -98,10 +113,20 @@ function CategoryBadge({ category, patternType }) {
   );
 }
 
-export default function ProgressScreen({ token, onBack }) {
+function formatCompareOption(item, pattern) {
+  const category = Number(item.category) || 0;
+  const meta = getCategoryMeta(category, pattern);
+  return `${formatFullDate(item.analyzedAt)} · C${category} ${meta.label}`;
+}
+
+export default function ProgressScreen({ token }) {
+  const navigation = useNavigation();
   const [error, setError] = useState(null);
   const { historyLoading, setHistoryLoading, history, setHistory, latestResult } = useAnalysis();
   const [patternType, setPatternType] = useState(latestResult?.patternType || 'crown');
+  const [compareBeforeIndex, setCompareBeforeIndex] = useState(1);
+  const [compareAfterIndex, setCompareAfterIndex] = useState(0);
+  const [comparePickerTarget, setComparePickerTarget] = useState(null);
 
   useEffect(() => {
     if (latestResult?.patternType) {
@@ -123,9 +148,19 @@ export default function ProgressScreen({ token, onBack }) {
     }
   }, [token, patternType, setHistoryLoading, setHistory]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [loadHistory])
+  );
+
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    if (history.length < 2) return;
+    setCompareAfterIndex(0);
+    setCompareBeforeIndex(Math.min(1, history.length - 1));
+  }, [history, patternType]);
+
+  const compareOrderValid = compareBeforeIndex > compareAfterIndex;
 
   const summary = useMemo(() => {
     if (!history.length) return null;
@@ -146,12 +181,38 @@ export default function ProgressScreen({ token, onBack }) {
   }, [history]);
 
   const beforeAfter = useMemo(() => {
-    if (history.length < 2) return null;
-    const before = Number(history[1].category) || 0;
-    const after = Number(history[0].category) || 0;
+    if (history.length < 2 || !compareOrderValid) return null;
+    const beforeItem = history[compareBeforeIndex];
+    const afterItem = history[compareAfterIndex];
+    const before = Number(beforeItem.category) || 0;
+    const after = Number(afterItem.category) || 0;
     const diff = after - before;
-    return { before, after, diff };
-  }, [history]);
+    const interpretation = getClassChangeInterpretation(diff);
+    return {
+      before,
+      after,
+      diff,
+      interpretation,
+      beforeItem,
+      afterItem,
+      beforeImageUri: getUploadImageUrl(beforeItem.filename),
+      afterImageUri: getUploadImageUrl(afterItem.filename),
+    };
+  }, [history, compareBeforeIndex, compareAfterIndex, compareOrderValid]);
+
+  const openComparePicker = (target) => {
+    if (history.length < 2) return;
+    setComparePickerTarget(target);
+  };
+
+  const handleSelectCompareIndex = (index) => {
+    if (comparePickerTarget === 'before') {
+      setCompareBeforeIndex(index);
+    } else if (comparePickerTarget === 'after') {
+      setCompareAfterIndex(index);
+    }
+    setComparePickerTarget(null);
+  };
 
   const latest = history[0] || null;
   const recentList = history.slice(0, 6);
@@ -173,13 +234,17 @@ export default function ProgressScreen({ token, onBack }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTextWrap}>
-          <Text style={styles.title}>분석 결과</Text>
+          <Text style={styles.title}>기록</Text>
           <Text style={styles.subtitle}>
             {getPatternLabel(patternType)} · 최근 1년 변화
           </Text>
         </View>
-        <TouchableOpacity style={styles.retryButton} onPress={onBack} activeOpacity={0.85}>
-          <Text style={styles.retryButtonText}>다시 분석하기</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => navigation.navigate('Analysis')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.retryButtonText}>새 분석</Text>
         </TouchableOpacity>
       </View>
 
@@ -213,7 +278,7 @@ export default function ProgressScreen({ token, onBack }) {
       {isMockEngine ? (
         <View style={styles.mockNotice}>
           <Text style={styles.mockNoticeText}>
-            M자 분석은 학습 모델 완성 전까지 임시(mock) 결과입니다.
+            최근 분석이 임시(mock) 결과입니다. AI 서버·모델 연결을 확인해 주세요.
           </Text>
         </View>
       ) : null}
@@ -235,6 +300,8 @@ export default function ProgressScreen({ token, onBack }) {
       ) : null}
 
       {latest ? (
+        <>
+        <MedicalDisclaimerCard variant="short" showResultHint />
         <View style={styles.card}>
           <Text style={styles.cardTitle}>최신 분석 결과</Text>
           <View style={styles.latestRow}>
@@ -249,6 +316,7 @@ export default function ProgressScreen({ token, onBack }) {
             <ConfidenceRing confidence={latest.probability} />
           </View>
         </View>
+        </>
       ) : null}
 
       {classProbabilityRows.length ? (
@@ -274,41 +342,142 @@ export default function ProgressScreen({ token, onBack }) {
         </View>
       ) : null}
 
-      {beforeAfter ? (
+      {history.length >= 2 ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Before / After 비교</Text>
-          <View style={styles.compareRow}>
-            <View style={styles.compareBox}>
-              <Text style={styles.compareLabel}>이전</Text>
-              <Text style={styles.compareScore}>C{beforeAfter.before}</Text>
-              <CategoryBadge category={beforeAfter.before} patternType={patternType} />
-            </View>
-            <Text style={styles.compareArrow}>→</Text>
-            <View style={styles.compareBox}>
-              <Text style={styles.compareLabel}>최신</Text>
-              <Text style={styles.compareScore}>C{beforeAfter.after}</Text>
-              <CategoryBadge category={beforeAfter.after} patternType={patternType} />
-            </View>
+          <Text style={styles.compareHint}>비교할 두 시점을 선택하세요. (이전 → 기준)</Text>
+
+          <View style={styles.compareSelectRow}>
+            <Text style={styles.compareSelectLabel}>이전 시점</Text>
+            <TouchableOpacity
+              style={styles.compareSelectButton}
+              onPress={() => openComparePicker('before')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.compareSelectButtonText} numberOfLines={2}>
+                {history[compareBeforeIndex]
+                  ? formatCompareOption(history[compareBeforeIndex], patternType)
+                  : '선택'}
+              </Text>
+              <Text style={styles.compareSelectChevron}>▼</Text>
+            </TouchableOpacity>
           </View>
-          <Text
-            style={[
-              styles.compareDiff,
-              {
-                color:
-                  beforeAfter.diff > 0
-                    ? COLORS.medical600
-                    : beforeAfter.diff < 0
-                    ? COLORS.red500
-                    : COLORS.neutral500,
-              },
-            ]}
-          >
-            {beforeAfter.diff > 0 ? '+' : ''}
-            {beforeAfter.diff}
-            {beforeAfter.diff > 0 ? ' 단계 증가' : beforeAfter.diff < 0 ? ' 단계 감소' : ' 단계 변화 없음'}
-          </Text>
+
+          <View style={styles.compareSelectRow}>
+            <Text style={styles.compareSelectLabel}>기준 시점</Text>
+            <TouchableOpacity
+              style={styles.compareSelectButton}
+              onPress={() => openComparePicker('after')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.compareSelectButtonText} numberOfLines={2}>
+                {history[compareAfterIndex]
+                  ? formatCompareOption(history[compareAfterIndex], patternType)
+                  : '선택'}
+              </Text>
+              <Text style={styles.compareSelectChevron}>▼</Text>
+            </TouchableOpacity>
+          </View>
+
+          {!compareOrderValid ? (
+            <Text style={styles.compareOrderWarning}>
+              이전 시점은 기준 시점보다 과거 날짜여야 합니다. (목록에서 아래쪽이 더 오래된 기록)
+            </Text>
+          ) : null}
+
+          {beforeAfter ? (
+            <>
+              <View style={styles.comparePhotoRow}>
+                <View style={styles.comparePhotoCol}>
+                  <Text style={styles.compareLabel}>이전</Text>
+                  {beforeAfter.beforeImageUri ? (
+                    <Image source={{ uri: beforeAfter.beforeImageUri }} style={styles.comparePhoto} />
+                  ) : (
+                    <View style={[styles.comparePhoto, styles.comparePhotoPlaceholder]}>
+                      <Text style={styles.comparePhotoPlaceholderText}>이미지 없음</Text>
+                    </View>
+                  )}
+                  <Text style={styles.compareDate}>{formatFullDate(beforeAfter.beforeItem.analyzedAt)}</Text>
+                  <Text style={styles.compareScore}>C{beforeAfter.before}</Text>
+                  <CategoryBadge category={beforeAfter.before} patternType={patternType} />
+                </View>
+                <Text style={styles.compareArrow}>→</Text>
+                <View style={styles.comparePhotoCol}>
+                  <Text style={styles.compareLabel}>기준</Text>
+                  {beforeAfter.afterImageUri ? (
+                    <Image source={{ uri: beforeAfter.afterImageUri }} style={styles.comparePhoto} />
+                  ) : (
+                    <View style={[styles.comparePhoto, styles.comparePhotoPlaceholder]}>
+                      <Text style={styles.comparePhotoPlaceholderText}>이미지 없음</Text>
+                    </View>
+                  )}
+                  <Text style={styles.compareDate}>{formatFullDate(beforeAfter.afterItem.analyzedAt)}</Text>
+                  <Text style={styles.compareScore}>C{beforeAfter.after}</Text>
+                  <CategoryBadge category={beforeAfter.after} patternType={patternType} />
+                </View>
+              </View>
+              <View style={styles.compareResultBox}>
+                <Text
+                  style={[
+                    styles.compareDiff,
+                    beforeAfter.interpretation.tone === 'better'
+                      ? styles.compareDiffBetter
+                      : beforeAfter.interpretation.tone === 'worse'
+                      ? styles.compareDiffWorse
+                      : styles.compareDiffSame,
+                  ]}
+                >
+                  변화 해석: {beforeAfter.interpretation.label}
+                </Text>
+                <Text style={styles.compareDiffDetail}>{beforeAfter.interpretation.detail}</Text>
+                <Text style={styles.compareDiffHint}>{beforeAfter.interpretation.hint}</Text>
+              </View>
+            </>
+          ) : null}
         </View>
       ) : null}
+
+      <Modal
+        visible={comparePickerTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setComparePickerTarget(null)}
+      >
+        <Pressable style={styles.pickerBackdrop} onPress={() => setComparePickerTarget(null)}>
+          <Pressable style={styles.pickerSheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.pickerTitle}>
+              {comparePickerTarget === 'before' ? '이전 시점 선택' : '기준 시점 선택'}
+            </Text>
+            <ScrollView style={styles.pickerList}>
+              {history.map((item, index) => {
+                const selected =
+                  comparePickerTarget === 'before'
+                    ? compareBeforeIndex === index
+                    : compareAfterIndex === index;
+                return (
+                  <TouchableOpacity
+                    key={`${item.id || item.analyzedAt}-${index}`}
+                    style={[styles.pickerItem, selected && styles.pickerItemSelected]}
+                    onPress={() => handleSelectCompareIndex(index)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.pickerItemText, selected && styles.pickerItemTextSelected]}>
+                      {formatCompareOption(item, patternType)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.pickerCloseButton}
+              onPress={() => setComparePickerTarget(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.pickerCloseButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {!historyLoading && !error && history.length ? (
         <View style={styles.card}>
@@ -347,18 +516,28 @@ export default function ProgressScreen({ token, onBack }) {
       {recentList.length ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>최근 분석 이력</Text>
-          {recentList.map((item, index) => (
-            <View
-              key={item.id ?? `${item.analyzedAt}-${index}`}
-              style={[styles.historyRow, index === recentList.length - 1 && styles.historyRowLast]}
-            >
-              <Text style={styles.historyDate}>{formatFullDate(item.analyzedAt)}</Text>
-              <View style={styles.historyRight}>
-                <Text style={styles.historyScore}>C{Number(item.category) || 0}</Text>
-                <CategoryBadge category={item.category} patternType={patternType} />
+          {recentList.map((item, index) => {
+            const thumbUri = getUploadImageUrl(item.filename);
+            return (
+              <View
+                key={item.id ?? `${item.analyzedAt}-${index}`}
+                style={[styles.historyRow, index === recentList.length - 1 && styles.historyRowLast]}
+              >
+                <View style={styles.historyLeft}>
+                  {thumbUri ? (
+                    <Image source={{ uri: thumbUri }} style={styles.historyThumb} />
+                  ) : (
+                    <View style={[styles.historyThumb, styles.historyThumbPlaceholder]} />
+                  )}
+                  <Text style={styles.historyDate}>{formatFullDate(item.analyzedAt)}</Text>
+                </View>
+                <View style={styles.historyRight}>
+                  <Text style={styles.historyScore}>C{Number(item.category) || 0}</Text>
+                  <CategoryBadge category={item.category} patternType={patternType} />
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       ) : null}
 
@@ -565,18 +744,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  compareRow: {
+  comparePhotoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  compareBox: {
+  comparePhotoCol: {
     flex: 1,
     backgroundColor: COLORS.neutral50,
     borderRadius: RADIUS.card,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
+  },
+  comparePhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    marginVertical: 8,
+    backgroundColor: COLORS.neutral200,
+  },
+  comparePhotoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  comparePhotoPlaceholderText: {
+    color: COLORS.neutral500,
+    fontSize: 11,
+  },
+  compareDate: {
+    fontSize: 11,
+    color: COLORS.neutral500,
+    marginBottom: 4,
   },
   compareLabel: {
     color: COLORS.neutral500,
@@ -595,10 +794,135 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
+  compareHint: {
+    fontSize: 12,
+    color: COLORS.neutral500,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  compareSelectRow: {
+    marginBottom: 10,
+  },
+  compareSelectLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.neutral500,
+    marginBottom: 6,
+  },
+  compareSelectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: COLORS.neutral50,
+    borderWidth: 1,
+    borderColor: COLORS.neutral200,
+    borderRadius: RADIUS.button,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  compareSelectButtonText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.neutral800,
+  },
+  compareSelectChevron: {
+    fontSize: 10,
+    color: COLORS.neutral400,
+  },
+  compareOrderWarning: {
+    marginBottom: 12,
+    fontSize: 12,
+    color: COLORS.amber500,
+    lineHeight: 18,
+  },
+  compareResultBox: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.neutral200,
+  },
   compareDiff: {
     textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  compareDiffBetter: {
+    color: COLORS.medical600,
+  },
+  compareDiffWorse: {
+    color: COLORS.red500,
+  },
+  compareDiffSame: {
+    color: COLORS.neutral500,
+  },
+  compareDiffDetail: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.neutral700,
+    marginBottom: 4,
+  },
+  compareDiffHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: COLORS.neutral500,
+    lineHeight: 18,
+  },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    maxHeight: '70%',
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  pickerTitle: {
     fontSize: 16,
     fontWeight: '700',
+    color: COLORS.neutral800,
+    marginBottom: 12,
+  },
+  pickerList: {
+    maxHeight: 320,
+  },
+  pickerItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.button,
+    marginBottom: 6,
+    backgroundColor: COLORS.neutral50,
+  },
+  pickerItemSelected: {
+    backgroundColor: COLORS.medical50,
+    borderWidth: 1,
+    borderColor: COLORS.medical600,
+  },
+  pickerItemText: {
+    fontSize: 14,
+    color: COLORS.neutral700,
+  },
+  pickerItemTextSelected: {
+    color: COLORS.medical700,
+    fontWeight: '700',
+  },
+  pickerCloseButton: {
+    marginTop: 12,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  pickerCloseButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.medical600,
   },
   probabilityRow: {
     marginBottom: 12,
@@ -660,6 +984,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.neutral200,
+  },
+  historyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+  },
+  historyThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: COLORS.neutral200,
+  },
+  historyThumbPlaceholder: {
+    backgroundColor: COLORS.neutral200,
   },
   historyRowLast: {
     borderBottomWidth: 0,
