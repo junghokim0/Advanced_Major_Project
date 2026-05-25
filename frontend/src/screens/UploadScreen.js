@@ -73,8 +73,8 @@ export default function UploadScreen({
   };
 
   const captureImage = async () => {
-    if (patternType === 'm_line') {
-      onOpenCustomCamera?.();
+    if (onOpenCustomCamera) {
+      onOpenCustomCamera(patternType);
       return;
     }
 
@@ -155,11 +155,11 @@ export default function UploadScreen({
             );
           })}
         </View>
-        {patternType === 'm_line' ? (
-          <Text style={styles.patternNotice}>
-            M자 촬영 시 커스텀 카메라·수평 확인이 적용됩니다. (가이드라인은 추후 추가)
-          </Text>
-        ) : null}
+        <Text style={styles.patternNotice}>
+          {patternType === 'm_line'
+            ? 'M자 촬영은 헤어라인 가이드와 자세 안내를 보며 직접 촬영합니다.'
+            : '정수리 촬영은 전용 가이드 화면을 보며 직접 촬영합니다.'}
+        </Text>
       </View>
 
       <View style={styles.actionRow}>
@@ -170,7 +170,7 @@ export default function UploadScreen({
         <TouchableOpacity style={styles.actionCard} onPress={captureImage} activeOpacity={0.85}>
           <Text style={styles.actionLabel}>Take Photo</Text>
           <Text style={styles.actionHint}>
-            {patternType === 'm_line' ? '수평 확인 촬영' : '카메라로 촬영'}
+            {patternType === 'm_line' ? 'M자 가이드 촬영' : '정수리 가이드 촬영'}
           </Text>
         </TouchableOpacity>
       </View>

@@ -18,6 +18,7 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState('upload');
   const [appPhase, setAppPhase] = useState('loading');
   const [pendingCapture, setPendingCapture] = useState(null);
+  const [cameraPatternType, setCameraPatternType] = useState('m_line');
   const { resetAnalysisState } = useAnalysis();
 
   useEffect(() => {
@@ -61,6 +62,7 @@ function AppContent() {
   if (token && currentScreen === 'camera') {
     return (
       <CameraCaptureScreen
+        patternType={cameraPatternType}
         onCapture={(asset) => {
           setPendingCapture(asset);
           setCurrentScreen('upload');
@@ -80,7 +82,10 @@ function AppContent() {
               userEmail={userEmail}
               pendingCapture={pendingCapture}
               onPendingCaptureHandled={handlePendingCaptureHandled}
-              onOpenCustomCamera={() => setCurrentScreen('camera')}
+              onOpenCustomCamera={(patternType) => {
+                setCameraPatternType(patternType || 'm_line');
+                setCurrentScreen('camera');
+              }}
               onLogout={handleLogout}
               onOpenProgress={() => setCurrentScreen('progress')}
             />
