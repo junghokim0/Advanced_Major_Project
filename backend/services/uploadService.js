@@ -4,6 +4,7 @@ const FormData = require('form-data');
 const uploadRepository = require('../repositories/uploadRepository');
 const analysisRepository = require('../repositories/analysisRepository');
 const { normalizePatternType } = require('../utils/patternType');
+const { parseAiBlurError } = require('../utils/aiErrorParser');
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 const AI_SERVER_TIMEOUT_MS = Number(process.env.AI_SERVER_TIMEOUT_MS || 30000);
@@ -104,19 +105,11 @@ exports.processUpload = async (file, user, patternTypeInput) => {
   const patternType = normalizePatternType(patternTypeInput);
   console.log(`[Upload] AI analyze patternType=${patternType} url=${AI_SERVER_URL}`);
 
-  const uploadId = await uploadRepository.saveUploadRecord({
-    filename: file.filename,
-    originalname: file.originalname,
-    size: file.size,
-    mimetype: file.mimetype,
-    patternType,
-    userId: user.userId,
-  });
-
   let analysisResult = null;
   let analysisError = null;
+  let aiResponse;
   try {
-    const aiResponse = await requestAIServer(file, patternType);
+    aiResponse = await requestAIServer(file, patternType);
     const {
       patternType: aiPatternType,
       predictedClass,
@@ -127,14 +120,6 @@ exports.processUpload = async (file, user, patternTypeInput) => {
       engine,
     } = aiResponse;
     const confidence = Math.max(probabilities.class1, probabilities.class2, probabilities.class3);
-    const resultStage = `class-${predictedClass}`;
-
-    await analysisRepository.saveAnalysisResult({
-      uploadId,
-      resultStage,
-      probability: confidence,
-    });
-
     analysisResult = {
       patternType: aiPatternType,
       engine,
@@ -146,8 +131,34 @@ exports.processUpload = async (file, user, patternTypeInput) => {
       correctionReason,
     };
   } catch (aiError) {
+    const blurError = parseAiBlurError(aiError);
+    if (blurError) {
+      throw blurError;
+    }
     analysisError = formatAiError(aiError);
     console.error('AI analysis failed:', analysisError);
+  }
+
+  const uploadId = await uploadRepository.saveUploadRecord({
+    filename: file.filename,
+    originalname: file.originalname,
+    size: file.size,
+    mimetype: file.mimetype,
+    patternType,
+    userId: user.userId,
+  });
+
+  if (analysisResult) {
+    const confidence = Math.max(
+      aiResponse.probabilities.class1,
+      aiResponse.probabilities.class2,
+      aiResponse.probabilities.class3
+    );
+    await analysisRepository.saveAnalysisResult({
+      uploadId,
+      resultStage: `class-${aiResponse.predictedClass}`,
+      probability: confidence,
+    });
   }
 
   return {

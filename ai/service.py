@@ -217,7 +217,7 @@ def predict_image(image):
 # ======================================
 uploaded_file = st.file_uploader(
     "분석할 이미지를 업로드하세요",
-    type=["jpg", "jpeg", "png"]
+    type=["jpg", "png"]
 )
 
 if uploaded_file is not None:

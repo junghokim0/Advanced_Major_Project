@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Scr
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../api';
+import BlurRetakeGuide from '../components/BlurRetakeGuide';
+import { isBlurQualityError } from '../constants/uploadQuality';
 import { useAnalysis } from '../context/AnalysisContext';
 
 const COLORS = {
@@ -35,6 +37,7 @@ export default function UploadScreen({
   const [image, setImage] = useState(null);
   const [patternType, setPatternType] = useState('crown');
   const [error, setError] = useState(null);
+  const [blurError, setBlurError] = useState(null);
   const { uploading, setUploading, latestResult, setLatestResult } = useAnalysis();
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function UploadScreen({
     }
     setLatestResult(null);
     setError(null);
+    setBlurError(null);
     onPendingCaptureHandled?.();
   }, [pendingCapture, onPendingCaptureHandled, setLatestResult]);
 
@@ -69,6 +73,7 @@ export default function UploadScreen({
     setImage(pickerResult.assets[0]);
     setLatestResult(null);
     setError(null);
+    setBlurError(null);
   };
 
   const captureImage = async () => {
@@ -95,6 +100,7 @@ export default function UploadScreen({
     setImage(cameraResult.assets[0]);
     setLatestResult(null);
     setError(null);
+    setBlurError(null);
   };
 
   const handleUpload = async () => {
@@ -105,6 +111,7 @@ export default function UploadScreen({
 
     setUploading(true);
     setError(null);
+    setBlurError(null);
 
     try {
       const uploadPatternType =
@@ -118,6 +125,12 @@ export default function UploadScreen({
       }
       navigation.navigate('Records');
     } catch (err) {
+      if (isBlurQualityError(err)) {
+        setBlurError(err);
+        setError(null);
+        return;
+      }
+      setBlurError(null);
       const msg = err?.message || '업로드에 실패했습니다.';
       setError(
         msg.includes('timed out') || msg.includes('Network')
@@ -203,6 +216,14 @@ export default function UploadScreen({
           <Text style={styles.primaryButtonText}>Upload</Text>
         )}
       </TouchableOpacity>
+
+      {blurError ? (
+        <BlurRetakeGuide
+          error={blurError}
+          onRetakePhoto={captureImage}
+          onPickGallery={pickImage}
+        />
+      ) : null}
 
       {error ? (
         <View style={styles.errorBox}>

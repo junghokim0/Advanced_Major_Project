@@ -30,12 +30,25 @@ function normalizeMime(mimetype) {
   return lower;
 }
 
+function rejectIfJpegExtension(filename = '') {
+  const ext = String(filename).toLowerCase().match(/\.[^.]+$/)?.[0] || '';
+  if (ext === '.jpeg') {
+    return '.jpeg 확장자는 허용하지 않습니다. .jpg 또는 .png를 사용해 주세요.';
+  }
+  return null;
+}
+
 /**
- * 업로드 바이트 검수: 크기·MIME·매직 바이트(jpg/jpeg/png).
+ * 업로드 바이트 검수: 크기·MIME·매직 바이트(jpg/png, .jpeg 확장자 제외).
  */
 function validateUploadBuffer(buffer, mimetype, filename = '') {
   if (!buffer || !Buffer.isBuffer(buffer)) {
     return { ok: false, error: '업로드 데이터가 비어 있습니다.' };
+  }
+
+  const extError = rejectIfJpegExtension(filename);
+  if (extError) {
+    return { ok: false, error: extError };
   }
 
   if (buffer.length < MIN_UPLOAD_BYTES) {
@@ -54,7 +67,7 @@ function validateUploadBuffer(buffer, mimetype, filename = '') {
 
   const detected = detectImageType(buffer);
   if (!detected) {
-    return { ok: false, error: 'jpg, jpeg, png 형식의 두피 사진만 업로드할 수 있습니다.' };
+    return { ok: false, error: 'jpg, png 형식의 두피 사진만 업로드할 수 있습니다.' };
   }
 
   const declared = normalizeMime(mimetype);

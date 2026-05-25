@@ -12,6 +12,8 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 import uvicorn
 
+from opencv_preprocess import evaluate_blur, pil_to_bgr, preprocess_for_inference
+
 
 APP_TITLE = "Hair Loss AI Server"
 PATTERN_CROWN = "crown"
@@ -269,6 +271,24 @@ async def analyze(
         pil_image = Image.open(BytesIO(raw)).convert("RGB")
     except UnidentifiedImageError as exc:
         raise HTTPException(status_code=400, detail="Invalid image format.") from exc
+
+    blur = evaluate_blur(pil_to_bgr(pil_image))
+    if not blur["ok"]:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "IMAGE_TOO_BLURRY",
+                "blurScore": blur["score"],
+                "minRequired": blur["minRequired"],
+                "inferenceSize": blur["inferenceSize"],
+                "message": (
+                    "사진이 흐려 분석할 수 없습니다. "
+                    "초점을 맞춰 다시 촬영하거나 선명한 사진을 선택해 주세요."
+                ),
+            },
+        )
+
+    pil_image, _preprocess_meta = preprocess_for_inference(pil_image, pattern_type)
 
     if pattern_type == PATTERN_CROWN:
         return analyze_with_model(crown_bundle, pil_image, pattern_type)

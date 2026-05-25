@@ -33,7 +33,7 @@ export async function buildImageUploadPayload(image) {
   });
 
   if (!result.base64?.length) {
-    throw new Error('이미지를 읽지 못했습니다. jpg, jpeg, png 사진을 다시 선택해 주세요.');
+    throw new Error('이미지를 읽지 못했습니다. jpg 또는 png 사진을 다시 선택해 주세요.');
   }
 
   const baseName = image.fileName?.replace(/\.[^.]+$/i, '') || 'photo';

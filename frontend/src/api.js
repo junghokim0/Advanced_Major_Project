@@ -114,7 +114,11 @@ export async function uploadImage(token, image, patternType = 'crown') {
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.error || 'Upload failed');
+    const err = new Error(errorBody?.error || 'Upload failed');
+    if (errorBody?.code) err.code = errorBody.code;
+    if (errorBody?.blurScore != null) err.blurScore = errorBody.blurScore;
+    if (errorBody?.minBlurScore != null) err.minBlurScore = errorBody.minBlurScore;
+    throw err;
   }
 
   return response.json();

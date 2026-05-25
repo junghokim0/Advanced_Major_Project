@@ -6,7 +6,7 @@ const { validateUploadBuffer } = require('../utils/uploadImageValidation');
 const detectMimeType = (filename = '') => {
   const ext = path.extname(filename).toLowerCase();
   if (ext === '.png') return 'image/png';
-  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.jpg') return 'image/jpeg';
   return 'image/jpeg';
 };
 
@@ -14,13 +14,14 @@ const extensionForMime = (mime) => (mime === 'image/png' ? '.png' : '.jpg');
 
 const resolveSavedExtension = (filename, detectedMime) => {
   const ext = path.extname(filename).toLowerCase();
-  if (['.jpg', '.jpeg', '.png'].includes(ext)) {
-    return ext === '.jpeg' ? '.jpg' : ext;
+  if (['.jpg', '.png'].includes(ext)) {
+    return ext;
   }
   return extensionForMime(detectedMime);
 };
 
 exports.uploadImage = async (req, res, next) => {
+  let savedPath = null;
   try {
     let file = req.file;
 
@@ -123,10 +124,18 @@ exports.uploadImage = async (req, res, next) => {
       req.body?.patternType || req.headers['x-pattern-type'] || req.query?.patternType;
     console.log('[Upload] patternType:', patternType);
 
+    savedPath = file.path;
     const result = await uploadService.processUpload(file, req.user, patternType);
     res.json(result);
   } catch (error) {
     console.error('Upload error:', error);
+    if (error.status === 422 && savedPath) {
+      try {
+        fs.unlinkSync(savedPath);
+      } catch {
+        // ignore
+      }
+    }
     next(error);
   }
 };

@@ -19,17 +19,19 @@ const storage = multer.diskStorage({
   }
 });
 
-// 파일 필터링: jpg, png, jpeg만 허용
+// 파일 필터링: .jpg, .png만 허용 (.jpeg 확장자 제외)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error('Only image files (jpg, png, jpeg) are allowed!'), false);
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.jpeg') {
+    return cb(new Error('Only .jpg or .png files are allowed (.jpeg extension is not supported).'), false);
   }
+  if (ext === '.jpg' && /jpeg|jpg/.test(file.mimetype)) {
+    return cb(null, true);
+  }
+  if (ext === '.png' && /png/.test(file.mimetype)) {
+    return cb(null, true);
+  }
+  cb(new Error('Only image files (.jpg, .png) are allowed!'), false);
 };
 
 // multer 설정
