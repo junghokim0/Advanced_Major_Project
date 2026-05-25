@@ -6,9 +6,18 @@ const { validateUploadBuffer } = require('../utils/uploadImageValidation');
 const detectMimeType = (filename = '') => {
   const ext = path.extname(filename).toLowerCase();
   if (ext === '.png') return 'image/png';
-  if (ext === '.webp') return 'image/webp';
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
   return 'image/jpeg';
+};
+
+const extensionForMime = (mime) => (mime === 'image/png' ? '.png' : '.jpg');
+
+const resolveSavedExtension = (filename, detectedMime) => {
+  const ext = path.extname(filename).toLowerCase();
+  if (['.jpg', '.jpeg', '.png'].includes(ext)) {
+    return ext === '.jpeg' ? '.jpg' : ext;
+  }
+  return extensionForMime(detectedMime);
 };
 
 exports.uploadImage = async (req, res, next) => {
@@ -54,7 +63,7 @@ exports.uploadImage = async (req, res, next) => {
       }
 
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const ext = path.extname(filename || 'photo.jpg');
+      const ext = resolveSavedExtension(filename || 'photo.jpg', validation.detectedMime);
       const savedFilename = `upload-${uniqueSuffix}${ext}`;
       const filepath = path.join(uploadsDir, savedFilename);
 
@@ -64,7 +73,7 @@ exports.uploadImage = async (req, res, next) => {
         fieldname: 'image',
         originalname: filename || 'photo.jpg',
         encoding: '7bit',
-        mimetype: (mimetype && mimetype.includes('/')) ? mimetype : detectMimeType(filename || 'photo.jpg'),
+        mimetype: validation.detectedMime,
         size: buffer.length,
         destination: uploadsDir,
         filename: savedFilename,

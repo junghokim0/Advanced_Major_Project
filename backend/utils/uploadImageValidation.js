@@ -31,7 +31,7 @@ function normalizeMime(mimetype) {
 }
 
 /**
- * 업로드 바이트 검수: 크기·MIME·매직 바이트(JPEG/PNG).
+ * 업로드 바이트 검수: 크기·MIME·매직 바이트(jpg/jpeg/png).
  */
 function validateUploadBuffer(buffer, mimetype, filename = '') {
   if (!buffer || !Buffer.isBuffer(buffer)) {
@@ -54,20 +54,17 @@ function validateUploadBuffer(buffer, mimetype, filename = '') {
 
   const detected = detectImageType(buffer);
   if (!detected) {
-    return { ok: false, error: 'JPEG 또는 PNG 형식의 두피 사진만 업로드할 수 있습니다.' };
+    return { ok: false, error: 'jpg, jpeg, png 형식의 두피 사진만 업로드할 수 있습니다.' };
   }
 
   const declared = normalizeMime(mimetype);
-  if (declared && !ALLOWED_MIME.has(declared)) {
-    return { ok: false, error: '허용되지 않는 이미지 형식입니다. (jpg, png만 가능)' };
-  }
-
-  if (declared && declared !== detected) {
+  if (declared && ALLOWED_MIME.has(declared) && declared !== detected) {
     return {
       ok: false,
       error: '파일 확장자·형식이 일치하지 않습니다. 다시 촬영하거나 저장 형식을 확인해 주세요.',
     };
   }
+  // 갤러리가 image/heic 등으로내도 매직 바이트가 JPEG/PNG면 허용
 
   return { ok: true, detectedMime: detected, filename };
 }

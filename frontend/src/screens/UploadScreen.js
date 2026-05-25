@@ -118,7 +118,12 @@ export default function UploadScreen({
       }
       navigation.navigate('Records');
     } catch (err) {
-      setError(err.message);
+      const msg = err?.message || '업로드에 실패했습니다.';
+      setError(
+        msg.includes('timed out') || msg.includes('Network')
+          ? `${msg}\n백엔드(:3000)·AI(:8000) 실행과 PC·폰 같은 Wi‑Fi를 확인해 주세요.`
+          : msg
+      );
     } finally {
       setUploading(false);
     }

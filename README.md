@@ -182,7 +182,8 @@ npm start
 | 항목 | 상태 | 설명 |
 |------|------|------|
 | **면책·의료 참고** | **구현** | 홈·업로드(짧은 문구), 기록(결과 시 힌트), 설정(전체 문구) — `MedicalDisclaimerCard`, `constants/medicalDisclaimer.js` |
-| **업로드 검수** | **구현** | JPEG/PNG 매직바이트, 8KB~5MB, MIME 불일치 거절 — `backend/utils/uploadImageValidation.js` |
+| **업로드 검수** | **구현** | **jpg, jpeg, png** 허용 · 매직바이트(JPEG/PNG), 8KB~5MB, MIME 불일치 거절 — `uploadImageValidation.js`, `uploadMiddleware.js` |
+| **업로드 허용 형식 (테스트)** | **반영** | 갤러리·파일 업로드 테스트용으로 **jpeg 확장자·`image/jpeg` MIME**을 jpg와 동일하게 허용 (README·에러 문구에 명시) |
 | **HTTPS (운영)** | **선택** | 백엔드 `REQUIRE_HTTPS=true` 시 업로드 API만 HTTPS 강제 (`uploadSecurityMiddleware.js`, `trust proxy`) |
 | **앱↔API HTTPS** | **권장** | 운영: `EXPO_PUBLIC_API_BASE_URL=https://...` · 개발 HTTP 시 설정 탭에 안내 |
 | **디스크 암호화** | **범위 밖** | 전면 E2E·저장 암호화 미적용 · JWT·bcrypt·HTTPS 전송으로 운영 권장 |
@@ -231,7 +232,7 @@ npm start
 |----|-----------|------|------|
 | FR-001 | 모발 이미지 촬영 | **부분** | 정수리: 갤러리/기본 카메라 · M자: 커스텀 카메라 |
 | FR-002 | 이미지 업로드 | **구현** | JWT + multer/JSON base64 |
-| FR-003 | 입력 이미지 검증 | **부분** | JPEG/PNG·용량·매직바이트 검수 · 초점/식별 불가 판별 없음 |
+| FR-003 | 입력 이미지 검증 | **부분** | jpg/jpeg/png·용량·매직바이트 검수 (테스트 업로드 포함) · 초점/식별 불가 판별 없음 |
 | FR-004 | 이미지 전처리 | **부분** | Pillow+torchvision 동작 · OpenCV(명도·채도·흐림) **보류** |
 | FR-005~008 | AI 분석·확률·결과 표시 | **구현** | crown 3-class · m_line 2-class |
 | FR-009 | 재촬영·품질 안내 | **미구현/보류** | 흐림 게이트=OpenCV 보류와 연동 예정 · 팀원 UX 병행 |
@@ -298,7 +299,7 @@ npm start
 
 - 정수리·M자 촬영/업로드/AI 분석·이력·Before/After(시점 선택, 호전·유지·악화)
 - M자 **표준 자세 안내**(타원·문구·pitch·crop), 클래스별 확률·신뢰도 UI, 주간 배너, 4탭 B안
-- **면책·의료 참고**, 업로드 **JPEG/PNG 검수**, 홈 **GPS·주소 → 네이버 지도 링크**
+- **면책·의료 참고**, 업로드 **jpg/jpeg/png 검수**(테스트용 반영), 홈 **GPS·주소 → 네이버 지도 링크**
 
 ### 팀원에게 받을 OpenCV 관련 값 (예시)
 

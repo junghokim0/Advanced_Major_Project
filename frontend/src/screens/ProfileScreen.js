@@ -36,7 +36,7 @@ export default function ProfileScreen({ userEmail, onLogout }) {
         <Text style={styles.infoHint}>{getApiBaseUrl()}</Text>
         <Text style={[styles.infoHint, { marginTop: 8 }]}>{PRIVACY_SECURITY_HINT}</Text>
         <Text style={[styles.infoHint, { marginTop: 6 }]}>
-          서버는 JPEG/PNG·용량·파일 시그니처를 검사합니다. 비밀번호는 bcrypt로 저장됩니다.
+          서버는 jpg, jpeg, png·용량·파일 시그니처를 검사합니다. 비밀번호는 bcrypt로 저장됩니다.
         </Text>
       </View>
 

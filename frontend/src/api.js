@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { buildImageUploadPayload } from './utils/imageUploadPayload';
 
 function resolveApiBaseUrl() {
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
@@ -90,33 +91,26 @@ export async function signup(email, password) {
 }
 
 export async function uploadImage(token, image, patternType = 'crown') {
-  const fileResponse = await fetch(image.uri);
-  const blob = await fileResponse.blob();
+  const { base64, filename, mimeType } = await buildImageUploadPayload(image);
 
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      resolve(result.split(',')[1] || '');
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
-  const response = await fetchWithTimeout(`${API_BASE_URL}/upload/image`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-Pattern-Type': patternType,
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/upload/image`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Pattern-Type': patternType,
+      },
+      body: JSON.stringify({
+        file: base64,
+        filename,
+        mimetype: mimeType,
+        patternType,
+      }),
     },
-    body: JSON.stringify({
-      file: base64,
-      filename: image.fileName || `photo.${image.uri.split('.').pop() || 'jpg'}`,
-      mimetype: image.type || 'image/jpeg',
-      patternType,
-    }),
-  });
+    90000
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
