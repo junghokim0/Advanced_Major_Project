@@ -71,7 +71,7 @@ EfficientNet-B0의 마지막 feature vector는 fully connected classification la
 ## 5. 모델 성능(85.45%)
 ![Model Performance](performance.png)
 
-## 6. service.py(ui)
+## 6. service.py(ui)-> 실제 서비스의 ui가 아닌 streamlit으로 간단하게 구현
 
 중요!!!→ 클래스를 구분할때 정상 클래스와 의심 클래스의 경계가 모호하다.
 
