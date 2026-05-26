@@ -7,7 +7,9 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "start:ai-mock": "node mockAiServer.js",
-    "start:ai-mock:legacy": "node mockAiServer.js"
+    "start:ai-mock:legacy": "node mockAiServer.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
   },
   "engines": {
     "node": ">=20.0.0"
