@@ -1,10 +1,13 @@
-# MOJI (Advanced_Major_Project)
+# MOJI
+### AI-Based Hair Loss Self-Monitoring System
 
 A **self-monitoring application for scalp and hair loss management** that allows users to capture crown (`crown`) and M-shaped hairline (`m_line`) images, perform AI-based analysis, track historical records, and compare before-and-after results.
 
 **This application is not intended to replace professional medical diagnosis.**
 
-<img width="471" height="660" alt="image" src="https://chatgpt.com/s/m_6a38e43d532c8191985ec423f1ab42ee" />
+<p align="center">
+  <img src="images/architecture.png" width="700">
+</p>
 
 
 ---
