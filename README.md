@@ -1,65 +1,73 @@
 # MOJI (Advanced_Major_Project)
 
-두피·탈모 **자가 모니터링** 앱 — 정수리(`crown`)·M자(`m_line`) 촬영·AI 분석·이력·Before/After. **의료 진단 대체 아님.**
+A **self-monitoring application for scalp and hair loss management** that allows users to capture crown (`crown`) and M-shaped hairline (`m_line`) images, perform AI-based analysis, track historical records, and compare before-and-after results.
 
-<img width="3572" height="5241" alt="시스템 아키텍처" src="https://github.com/user-attachments/assets/04f64c1d-1642-44cc-bddf-a08bf28827d1" />
+**This application is not intended to replace professional medical diagnosis.**
 
----
+<img width="471" height="660" alt="image" src="https://github.com/user-attachments/assets/4885534b-3d9d-456a-8a50-4745bb1058c4" />
 
-## 구현된 기능 목록
-
-### 앱 (React Native / Expo)
-
-| 기능 | 설명 |
-|------|------|
-| 로그인·회원가입 | JWT (`LoginScreen`) |
-| 4탭 UI | 홈 · 분석(업로드) · 기록 · 설정 |
-| 패턴 선택 | 정수리 / M자 (`UploadScreen`) |
-| 갤러리·업로드 | jpg·png, `ImageManipulator` 정규화 후 Base64 업로드 |
-| M자 가이드 촬영 | 타원 오버레이, 수평·pitch(-10°), 가이드 영역 **crop** |
-| 흐림 시 재촬영 안내 | `BlurRetakeGuide` — 다시 촬영 / 갤러리 재선택 |
-| 홈 요약 | 최근 분석, 패턴별 단계·팁, **이번 주 미촬영** 배너 |
-| 기록 | 패턴별 이력, 썸네일, 클래스 추이 차트 |
-| Before/After | 시점 2개 선택, 나란히 비교, **호전·유지·악화** |
-| 주변 병원·약국 | GPS·주소 → **네이버 지도 링크** (앱 내 지도 API 없음) |
-| 면책·의료 참고 | 홈·업로드·기록·설정 (`MedicalDisclaimerCard`) |
-| 설정 | API URL·HTTP/HTTPS 안내, 로그아웃 |
-
-### 백엔드 (Express + MySQL)
-
-| 기능 | 설명 |
-|------|------|
-| 인증 | JWT, bcrypt |
-| 업로드 | JSON Base64 · jpg/png · `.jpeg` 확장자 제외 · 8KB~5MB · 매직바이트 |
-| 분석 연동 | `patternType` 저장 후 AI 서버 호출 |
-| 이력 API | `GET /api/analysis/history?patternType=` |
-| 정적 파일 | `/uploads/<filename>` |
-| HTTPS (선택) | `REQUIRE_HTTPS=true` 시 업로드 API만 HTTPS 강제 |
-
-### AI (FastAPI + EfficientNet)
-
-| 기능 | 설명 |
-|------|------|
-| 통합 서버 | `:8000` — `crown` 3-class, `m_line` 2-class |
-| 전처리 | 224 Laplacian **&lt; 80 → 거절(422)** · HSV 명도·채도 보정 · 224 추론 |
-| 경계 보정 | 정수리 class2 경계 구간 → class1 보정 (기존 로직) |
 
 ---
 
-## 로컬 실행 방법
+## Implemented Features
 
-**터미널 4개**를 각각 띄워 실행합니다. (루트 `npm run dev`·`dev-all.js` 등 **한 번에 실행은 롤백·미사용**)
+### Mobile App (React Native / Expo)
 
-**사전 준비:** Node 20+, Python 3.11+, Docker Desktop, (실기기) PC·폰 같은 Wi‑Fi
+| Feature                     | Description                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Login & Registration        | JWT-based authentication (`LoginScreen`)                                           |
+| Four-Tab UI                 | Home · Analysis (Upload) · History · Settings                                      |
+| Pattern Selection           | Crown / M-line selection (`UploadScreen`)                                          |
+| Gallery Upload              | JPG/PNG upload with Base64 conversion after normalization using `ImageManipulator` |
+| Guided M-line Capture       | Oval overlay, horizontal alignment, pitch correction (-10°), and guided crop area  |
+| Blur Retake Guidance        | `BlurRetakeGuide` provides retake or gallery re-selection options                  |
+| Home Summary                | Recent analyses, stage-specific tips, and weekly reminder banner                   |
+| History Tracking            | Pattern-specific records, thumbnails, and class progression charts                 |
+| Before/After Comparison     | Side-by-side comparison with improvement, maintenance, or deterioration indicators |
+| Nearby Clinics & Pharmacies | GPS and address-based search with Naver Map links                                  |
+| Medical Disclaimer          | Displayed on Home, Upload, History, and Settings screens (`MedicalDisclaimerCard`) |
+| Settings                    | API URL configuration, HTTP/HTTPS guidance, and logout                             |
 
-**1) MySQL**
+### Backend (Express + MySQL)
+
+| Feature                | Description                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| Authentication         | JWT and bcrypt                                                                                           |
+| Upload Validation      | JSON Base64 upload, JPG/PNG only, `.jpeg` extension excluded, file size 8KB–5MB, magic-byte verification |
+| AI Integration         | Stores `patternType` and forwards requests to the AI server                                              |
+| History API            | `GET /api/analysis/history?patternType=`                                                                 |
+| Static File Service    | `/uploads/<filename>`                                                                                    |
+| Optional HTTPS Support | Upload APIs can be restricted to HTTPS when `REQUIRE_HTTPS=true`                                         |
+
+### AI Server (FastAPI + EfficientNet)
+
+| Feature             | Description                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Unified Server      | `:8000` supporting both `crown` (3-class) and `m_line` (2-class) classification                            |
+| Preprocessing       | Rejects images with Laplacian variance < 80 (422), HSV brightness/saturation correction, 224×224 inference |
+| Boundary Adjustment | Crown class-2 boundary correction to class-1 using rule-based logic                                        |
+
+---
+
+## Local Setup
+
+The project is executed using **four separate terminals**. Running all services simultaneously through a single script (`npm run dev`, `dev-all.js`, etc.) is no longer used.
+
+### Prerequisites
+
+* Node.js 20+
+* Python 3.11+
+* Docker Desktop
+* Same Wi-Fi network for PC and mobile device (for physical device testing)
+
+### 1. MySQL
 
 ```bash
 cd backend
 docker compose up -d
 ```
 
-**2) AI** (`:8000`)
+### 2. AI Server (`:8000`)
 
 ```bash
 cd ai
@@ -69,7 +77,7 @@ python -m pip install -r requirements.txt
 python api_server.py
 ```
 
-**3) Backend** (`:3000`)
+### 3. Backend (`:3000`)
 
 ```bash
 cd backend
@@ -77,7 +85,7 @@ npm install
 npm start
 ```
 
-**4) Frontend** (Expo)
+### 4. Frontend (Expo)
 
 ```bash
 cd frontend
@@ -85,15 +93,15 @@ npm install
 npm start
 ```
 
-**확인**
+### Verification
 
-| 서비스 | URL |
-|--------|-----|
-| AI | http://localhost:8000/health |
-| Backend | http://localhost:3000 |
-| Frontend | Expo QR |
+| Service  | URL                          |
+| -------- | ---------------------------- |
+| AI       | http://localhost:8000/health |
+| Backend  | http://localhost:3000        |
+| Frontend | Expo QR Code                 |
 
-**`backend/.env` 예시**
+### Example `backend/.env`
 
 ```bash
 DB_HOST=localhost
@@ -104,45 +112,55 @@ DB_NAME=app_db
 AI_SERVER_URL=http://localhost:8000
 ```
 
-> Windows 로컬 MySQL이 3306을 쓰면 Docker는 **3307→3306** 매핑. 포트 변경 시 `docker-compose.yml`과 `DB_PORT`를 함께 맞출 것.
+> If MySQL is already using port 3306 on Windows, Docker maps port 3307 to 3306. Update both `docker-compose.yml` and `DB_PORT` accordingly.
 
 ---
 
-## 아키텍처
+## Architecture
 
 ```text
-[앱] patternType (crown | m_line)
-  → Backend :3000 — 저장·JWT·이력
-  → FastAPI :8000 — 흐림 검사 → HSV 보정 → EfficientNet
+[App] patternType (crown | m_line)
+  → Backend :3000 — Storage, JWT Authentication, History Management
+  → FastAPI :8000 — Blur Detection → HSV Correction → EfficientNet Inference
 ```
 
-- DB: `uploads.pattern_type` + `analysis_histories` (패턴별 이력 조회)
-- M자: 앱에서 **crop 후** 업로드 → AI는 동일 전처리
-- 갤러리: crop 없음, 동일 업로드·AI 파이프
+* Database tables: `uploads.pattern_type` and `analysis_histories`
+* M-line images are cropped on the mobile app before upload
+* Gallery uploads follow the same AI inference pipeline without cropping
 
 ---
 
-## AI 패턴
+## AI Models
 
-| patternType | 모델 | 비고 |
-|-------------|------|------|
-| `crown` | `ai/bestmodel/best_model.pth` | 3-class |
-| `m_line` | `ai/forhead/best_model_forehead.pth` | 2-class (1→경미, 3→진행) |
+| Pattern Type | Model                                | Description                                               |
+| ------------ | ------------------------------------ | --------------------------------------------------------- |
+| `crown`      | `ai/bestmodel/best_model.pth`        | 3-class classification                                    |
+| `m_line`     | `ai/forhead/best_model_forehead.pth` | 2-class classification (Class 1: Mild, Class 3: Advanced) |
 
-전처리 기준: `ai/preprocess_config.py` (HSV 권장 범위, `LAPLACIAN_VAR_MIN=80`)
+Preprocessing configuration is defined in:
+
+```text
+ai/preprocess_config.py
+```
+
+HSV recommendations and:
+
+```text
+LAPLACIAN_VAR_MIN = 80
+```
 
 ---
 
-## DB 마이그레이션 (기존 DB 업데이트 시)
+## Database Migration
 
-**PowerShell**
+### PowerShell
 
 ```powershell
 cd backend
 Get-Content -Raw migrations\001_add_pattern_type.sql | docker compose exec -T mysql mysql -uapp_user -papp_password app_db
 ```
 
-**bash**
+### Bash
 
 ```bash
 cd backend
@@ -151,37 +169,61 @@ docker compose exec -T mysql mysql -uapp_user -papp_password app_db < migrations
 
 ---
 
-## 미구현 · 보류
+## Deferred / Not Implemented
 
-| 항목 | 상태 |
-|------|------|
-| 로컬 푸시 알림 | 제거 (`expo-notifications` 미사용) |
-| M자 예시 JPG 모달 | 미구현 (실시간 가이드로 대체) |
-| 정수리 전용 촬영 가이드 | 약함 (갤러리·기본 카메라) |
-| 얼굴 블러·가이드 강화 | 팀원 진행 |
-| OpenCV 명도·채도 **거절** 게이트 | 보정만 · 어두움/밝음 픽셀 비율 임계 미합의 |
-| 앱 내 지도 SDK | 네이버 **링크**만 |
-| 포인트·리텐션 | 미구현 |
-| OpenCV 흐림(Laplacian) 극단 튜닝 | 기본 80 · 실사 추가 튜닝 가능 |
+| Feature                                     | Status                                              |
+| ------------------------------------------- | --------------------------------------------------- |
+| Local Push Notifications                    | Removed (`expo-notifications` not used)             |
+| M-line Example JPG Modal                    | Not Implemented (replaced by live capture guidance) |
+| Crown-Specific Capture Guide                | Limited support                                     |
+| Face Blur & Enhanced Guidance               | In progress                                         |
+| OpenCV Brightness/Saturation Rejection Gate | Correction only; threshold not finalized            |
+| Embedded Map SDK                            | Naver Map links only                                |
+| Point / Retention System                    | Not implemented                                     |
+| OpenCV Blur Threshold Optimization          | Default threshold 80; additional tuning possible    |
 
-**레거시:** `backend/mockAiServer.js` (:5001) — 사용 안 함
+**Legacy Component**
 
----
+```text
+backend/mockAiServer.js
+```
 
-## 요구사항 문서 대비 (요약)
-
-상세 FR·기획보고서 대조표는 팀 내부 문서 기준. 코드 기준 핵심만:
-
-- **구현:** 촬영·업로드·AI·이력·Before/After·면책·업로드 검수·HSV 보정·흐림 재촬영 안내·지도 링크
-- **부분:** 정수리 촬영 표준화, 클래스 차트(밀도·굵기 수치 없음), HTTPS 운영 설정
-- **범위 외:** 다부위 촬영, 모공·굵기 2단 UI, 포인트
+Runs on port `:5001` and is no longer used.
 
 ---
 
-## 트러블슈팅
+## Requirement Coverage Summary
 
-| 증상 | 조치 |
-|------|------|
-| AI `EADDRINUSE :8000` | `netstat -ano \| findstr :8000` → `taskkill /PID <pid> /F` |
-| 업로드 타임아웃 | AI·백엔드 실행, 같은 Wi‑Fi, Expo `hostUri` |
-| 흐림인데 통과 | AI 서버 재시작 (`opencv`·흐림 검사 반영 여부) |
+### Implemented
+
+* Image capture and upload
+* AI analysis
+* Historical records
+* Before/After comparison
+* Medical disclaimer
+* Upload validation
+* HSV correction
+* Blur retake guidance
+* Nearby clinic and pharmacy links
+
+### Partially Implemented
+
+* Standardized crown image capture
+* Class progression charts (without density/thickness measurements)
+* Production HTTPS deployment
+
+### Out of Scope
+
+* Multi-region scalp analysis
+* Follicle and hair thickness visualization
+* Point and reward systems
+
+---
+
+## Troubleshooting
+
+| Issue                        | Solution                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| AI Server `EADDRINUSE :8000` | `netstat -ano \| findstr :8000` → `taskkill /PID <pid> /F`                                                                |
+| Upload Timeout               | Ensure AI server and backend are running, connected to the same Wi-Fi network, and Expo `hostUri` is configured correctly |
+| Blurry Image Accepted        | Restart the AI server and verify blur-detection preprocessing is enabled                                                  |
