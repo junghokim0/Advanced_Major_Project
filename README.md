@@ -4,7 +4,7 @@ A **self-monitoring application for scalp and hair loss management** that allows
 
 **This application is not intended to replace professional medical diagnosis.**
 
-<img width="471" height="660" alt="image" src="https://github.com/user-attachments/assets/4885534b-3d9d-456a-8a50-4745bb1058c4" />
+<img width="471" height="660" alt="image" src="https://chatgpt.com/s/m_6a38e43d532c8191985ec423f1ab42ee" />
 
 
 ---
